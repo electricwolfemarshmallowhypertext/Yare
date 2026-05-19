@@ -74,6 +74,25 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+def _bundle_hash(selected_items: list[dict[str, Any]]) -> str:
+    material = []
+    for item in selected_items:
+        p = str(item.get("path") or "")
+        h = str(item.get("sha256") or "")
+        if p:
+            material.append({"path": p, "sha256": h})
+    material.sort(key=lambda x: x["path"])
+    payload = json.dumps(material, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _display_path(root: Path, path: Path) -> str:
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except Exception:
+        return str(path.resolve())
+
+
 def _merge_dict(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     out = dict(base)
     for k, v in override.items():
@@ -350,7 +369,7 @@ def _build_item(root: Path, path: Path, kind: str, reason: str, score: int) -> d
     }
 
 
-def resolve_context(root: Path, task: str) -> dict[str, Any]:
+def resolve_context(root: Path, task: str, output_path: Path | None = None) -> tuple[dict[str, Any], Path]:
     cfg = _load_config(root)
     validation = validate_workspace(root)
     files = _discover_context_files(root)
@@ -437,10 +456,13 @@ def resolve_context(root: Path, task: str) -> dict[str, Any]:
         },
         "validation": {"ok": validation["ok"], "errors": validation["errors"], "warnings": validation["warnings"]},
     }
-    out_path = root / ".agentmd" / "resolved-context.json"
+    output["context_bundle_hash"] = _bundle_hash(selected)
+    out_path = output_path if output_path is not None else Path(".agentmd/resolved-context.json")
+    if not out_path.is_absolute():
+        out_path = root / out_path
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(output, indent=2), encoding="utf-8")
-    return output
+    return output, out_path.resolve()
 
 
 def _run_git(root: Path, args: list[str]) -> tuple[bool, str]:
@@ -449,8 +471,8 @@ def _run_git(root: Path, args: list[str]) -> tuple[bool, str]:
     except Exception as e:
         return False, str(e)
     if proc.returncode != 0:
-        return False, (proc.stderr or proc.stdout or "").strip()
-    return True, proc.stdout.strip()
+        return False, (proc.stderr or proc.stdout or "").rstrip("\r\n")
+    return True, proc.stdout.rstrip("\r\n")
 
 
 def _git_state(root: Path) -> dict[str, Any]:
@@ -461,20 +483,34 @@ def _git_state(root: Path) -> dict[str, Any]:
             "commit": None,
             "dirty": None,
             "changed_files": [],
+            "untracked_files": [],
             "reason": "not_a_git_repository",
         }
     ok_status, status_out = _run_git(root, ["status", "--porcelain"])
     changed: list[str] = []
+    untracked: list[str] = []
     dirty = None
     if ok_status:
         lines = [line for line in status_out.splitlines() if line.strip()]
         dirty = len(lines) > 0
         for line in lines:
+            status_code = line[:2]
             payload = line[3:].strip()
             if "->" in payload:
                 payload = payload.split("->", 1)[1].strip()
-            changed.append(payload.replace("\\", "/"))
-    return {"available": True, "commit": commit, "dirty": dirty, "changed_files": changed, "reason": None}
+            normalized = payload.replace("\\", "/")
+            if status_code == "??":
+                untracked.append(normalized)
+            else:
+                changed.append(normalized)
+    return {
+        "available": True,
+        "commit": commit,
+        "dirty": dirty,
+        "changed_files": changed,
+        "untracked_files": untracked,
+        "reason": None,
+    }
 
 
 def _load_resolved(root: Path) -> dict[str, Any] | None:
@@ -512,6 +548,11 @@ def write_receipt(
                 detected_changes.append(rel_path)
 
     changed_files = git.get("changed_files") if git.get("available") else detected_changes
+    untracked_files = git.get("untracked_files") if git.get("available") else []
+    file_hashes = {item["path"]: item["sha256"] for item in selected_context if item.get("path")}
+    context_bundle_hash = (resolved or {}).get("context_bundle_hash") if resolved else None
+    if not context_bundle_hash:
+        context_bundle_hash = _bundle_hash(selected_context)
     timestamp = datetime.now(timezone.utc)
     receipt = {
         "timestamp": timestamp.isoformat().replace("+00:00", "Z"),
@@ -521,11 +562,14 @@ def write_receipt(
         "command_run": command_run,
         "resolved_context_file": ".agentmd/resolved-context.json" if resolved else None,
         "selected_context_files": selected_context,
+        "file_hashes": file_hashes,
+        "context_bundle_hash": context_bundle_hash,
         "git_commit": git.get("commit"),
         "git_dirty": git.get("dirty"),
         "git_available": git.get("available"),
         "git_reason": git.get("reason"),
         "changed_files": changed_files,
+        "untracked_files": untracked_files,
         "validation": {"ok": validation["ok"], "errors": validation["errors"], "warnings": validation["warnings"]},
     }
     receipt_material = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -565,13 +609,18 @@ def doctor(
 def resolve(
     task: str = typer.Option(..., "--task", help="Task to resolve context for"),
     root: Path = typer.Option(Path("."), "--root", help="Workspace root"),
+    output: Path = typer.Option(Path(".agentmd/resolved-context.json"), "--output", help="Resolved context output path"),
+    json_output: bool = typer.Option(False, "--json", help="Print resolved context as JSON"),
 ) -> None:
     root = root.resolve()
-    output = resolve_context(root, task)
-    out_path = root / ".agentmd" / "resolved-context.json"
-    typer.echo(f"resolved_context: {_relative(root, out_path)}")
-    typer.echo(f"selected_files: {output['totals']['selected_files']}")
-    typer.echo(f"estimated_tokens: {output['totals']['estimated_tokens']}")
+    resolved, out_path = resolve_context(root, task, output_path=output)
+    if json_output:
+        typer.echo(json.dumps(resolved, indent=2))
+        return
+    typer.echo(f"resolved_context: {_display_path(root, out_path)}")
+    typer.echo(f"context_bundle_hash: {resolved['context_bundle_hash']}")
+    typer.echo(f"selected_files: {resolved['totals']['selected_files']}")
+    typer.echo(f"estimated_tokens: {resolved['totals']['estimated_tokens']}")
 
 
 @app.command()
