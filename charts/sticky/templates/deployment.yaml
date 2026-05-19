@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sticky.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "sticky.name" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "sticky.name" . }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "sticky.name" . }}
+    spec:
+      containers:
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+            - containerPort: {{ .Values.service.metricsPort }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "sticky.fullname" . }}-config
+          env:
+            {{- if .Values.secretMount.enabled }}
+            - name: API_KEYS_FILE
+              value: "{{ .Values.secretMount.path }}/api_keys"
+            - name: ENCRYPTION_KEY_PATH
+              value: "{{ .Values.secretMount.path }}/fernet.key"
+            - name: REGISTRATION_TOKEN_FILE
+              value: "{{ .Values.secretMount.path }}/registration.token"
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+{{ toYaml .Values.resources | indent 12 }}
+          volumeMounts:
+            {{- if .Values.secretMount.enabled }}
+            - name: secrets
+              mountPath: {{ .Values.secretMount.path }}
+              readOnly: true
+            {{- end }}
+      volumes:
+        {{- if .Values.secretMount.enabled }}
+        - name: secrets
+          secret:
+            secretName: {{ include "sticky.fullname" . }}-secrets
+        {{- end }}

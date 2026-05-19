@@ -1,0 +1,19 @@
+version: 1
+limits:
+  max_file_bytes: 131072
+  max_total_bytes: 524288
+resolve:
+  max_skills: 6
+  max_memory: 6
+  max_policies: 6
+  max_evals: 4
+skills:
+  required_metadata:
+    - id
+    - name
+    - description
+    - version
+    - permissions
+  forbidden_permissions:
+    - filesystem:write_outside_workspace
+    - network:admin

@@ -1,0 +1,73 @@
+image:
+  repository: your-registry/memory-service
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+service:
+  type: ClusterIP
+  port: 8000
+  metricsPort: 9090
+
+ingress:
+  enabled: false
+  className: nginx
+  hosts:
+    - host: sticky.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []  # - secretName: sticky-tls, hosts: [sticky.example.com]
+
+resources:
+  limits:
+    cpu: "1"
+    memory: "1Gi"
+  requests:
+    cpu: "100m"
+    memory: "256Mi"
+
+env:
+  ENV: production
+  LOG_LEVEL: INFO
+  REQUEST_MAX_BYTES: "10485760"
+  REDIS_URL: "redis://redis:6379/0"
+  # DATABASE_URL example for PgBouncer:
+  # DATABASE_URL: "postgresql+psycopg2://memory:memorypass@pgbouncer:6432/memorydb"
+  METRICS_PORT: "9090"
+  ALLOWED_ORIGINS: "*"
+  TRUSTED_HOSTS: "*"
+  PROXY_COUNT: "1"
+  RATE_PLANS: '{"basic":{"limit":60,"window":60},"pro":{"limit":600,"window":60},"partner":{"limit":3000,"window":60}}'
+
+secrets:
+  apiKeys: ""            # optional; if empty, mount secret file from external Secret
+  fernetKey: ""          # optional
+  registrationToken: ""  # optional
+
+secretMount:
+  enabled: true
+  path: /run/secrets
+
+strategy:
+  type: rolling # rolling|argo-canary|argo-bluegreen
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  cpu:
+    averageUtilization: 70
+
+pgbouncer:
+  enabled: false
+  image: bitnami/pgbouncer:1.22.0
+  port: 6432
+  authUser: memory
+  authPassword: memorypass
+  dbName: memorydb
+  host: postgres.default.svc.cluster.local
+  poolMode: transaction
+  maxClientConn: 100
+  defaultPoolSize: 20

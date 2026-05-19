@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>AgentMD Explainable Context Results</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    body { font-family: ui-sans-serif, system-ui; margin: 20px; color: #111; background: #f8fafc; }
+    h1 { font-size: 22px; margin-bottom: 10px; }
+    .card { background: #fff; border: 1px solid #dbe2ea; border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+    .row { display: grid; grid-template-columns: 220px 1fr; gap: 10px; padding: 4px 0; }
+    .label { font-weight: 600; }
+    code { background: #f1f5f9; padding: 2px 4px; border-radius: 4px; }
+    pre { background: #0f172a; color: #e2e8f0; padding: 10px; border-radius: 6px; overflow: auto; }
+    a { color: #0f62fe; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <h1>AgentMD Explainable Context Results</h1>
+  <p><a href="/dashboard/dashboard.html">Back to runtime dashboard</a></p>
+
+  <div class="card">
+    <div class="row"><div class="label">Task</div><div id="task">loading...</div></div>
+    <div class="row"><div class="label">Receipt Hash</div><div id="receipt_hash">loading...</div></div>
+    <div class="row"><div class="label">Validation</div><div id="validation">loading...</div></div>
+  </div>
+
+  <div class="card">
+    <h3>Selected Context</h3>
+    <pre id="selected">loading...</pre>
+  </div>
+
+  <div class="card">
+    <h3>Why Selected</h3>
+    <pre id="why">loading...</pre>
+  </div>
+
+  <div class="card">
+    <h3>Policy Warnings</h3>
+    <pre id="warnings">loading...</pre>
+  </div>
+
+  <div class="card">
+    <h3>Changed Files</h3>
+    <pre id="changed">loading...</pre>
+  </div>
+
+  <script>
+    async function loadResults() {
+      const res = await fetch('/agentmd/results');
+      if (!res.ok) {
+        throw new Error('HTTP ' + res.status);
+      }
+      const data = await res.json();
+      document.getElementById('task').textContent = data.task || '(none)';
+      document.getElementById('receipt_hash').textContent = data.receipt_hash || '(none)';
+      document.getElementById('validation').textContent = JSON.stringify(data.validation_status || {}, null, 2);
+      document.getElementById('selected').textContent = JSON.stringify(data.selected_context || [], null, 2);
+      document.getElementById('why').textContent = JSON.stringify(data.why_selected || [], null, 2);
+      document.getElementById('warnings').textContent = JSON.stringify(data.policy_warnings || [], null, 2);
+      document.getElementById('changed').textContent = JSON.stringify(data.changed_files || [], null, 2);
+    }
+    loadResults().catch((err) => {
+      document.getElementById('task').textContent = String(err);
+      document.getElementById('receipt_hash').textContent = String(err);
+      document.getElementById('validation').textContent = String(err);
+      document.getElementById('selected').textContent = String(err);
+      document.getElementById('why').textContent = String(err);
+      document.getElementById('warnings').textContent = String(err);
+      document.getElementById('changed').textContent = String(err);
+    });
+  </script>
+</body>
+</html>

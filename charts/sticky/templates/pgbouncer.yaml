@@ -1,0 +1,74 @@
+{{- if .Values.pgbouncer.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "sticky.fullname" . }}-pgbouncer-cm
+data:
+  pgbouncer.ini: |
+    [databases]
+    {{ .Values.pgbouncer.dbName }} = host={{ .Values.pgbouncer.host }} port=5432 dbname={{ .Values.pgbouncer.dbName }}
+    [pgbouncer]
+    listen_addr = 0.0.0.0
+    listen_port = {{ .Values.pgbouncer.port }}
+    auth_type = md5
+    auth_file = /etc/pgbouncer/userlist.txt
+    pool_mode = {{ .Values.pgbouncer.poolMode }}
+    max_client_conn = {{ .Values.pgbouncer.maxClientConn }}
+    default_pool_size = {{ .Values.pgbouncer.defaultPoolSize }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "sticky.fullname" . }}-pgbouncer-secret
+stringData:
+  userlist.txt: '"{{ .Values.pgbouncer.authUser }}" "{{ .Values.pgbouncer.authPassword }}"'
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sticky.fullname" . }}-pgbouncer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "sticky.fullname" . }}-pgbouncer
+  template:
+    metadata:
+      labels:
+        app: {{ include "sticky.fullname" . }}-pgbouncer
+    spec:
+      containers:
+        - name: pgbouncer
+          image: {{ .Values.pgbouncer.image }}
+          ports:
+            - containerPort: {{ .Values.pgbouncer.port }}
+          volumeMounts:
+            - name: cfg
+              mountPath: /etc/pgbouncer
+      volumes:
+        - name: cfg
+          projected:
+            sources:
+              - configMap:
+                  name: {{ include "sticky.fullname" . }}-pgbouncer-cm
+                  items:
+                    - key: pgbouncer.ini
+                      path: pgbouncer.ini
+              - secret:
+                  name: {{ include "sticky.fullname" . }}-pgbouncer-secret
+                  items:
+                    - key: userlist.txt
+                      path: userlist.txt
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgbouncer
+spec:
+  selector:
+    app: {{ include "sticky.fullname" . }}-pgbouncer
+  ports:
+    - name: pgbouncer
+      port: {{ .Values.pgbouncer.port }}
+      targetPort: {{ .Values.pgbouncer.port }}
+{{- end }}

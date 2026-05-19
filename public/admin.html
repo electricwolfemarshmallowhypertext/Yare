@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Sticky Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    body { font-family: ui-sans-serif, system-ui; margin: 20px; color: #111; }
+    h1 { font-size: 22px; margin-bottom: 12px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; }
+    label { display:block; margin-top: 8px; font-size: 12px; color:#555; }
+    input, textarea, select { width:100%; padding:8px; margin-top:4px; }
+    button { margin-top:8px; padding:8px 10px; }
+    pre { background:#fafafa; padding:8px; border-radius:6px; max-height:240px; overflow:auto; }
+  </style>
+</head>
+<body>
+  <h1>Sticky Admin</h1>
+  <div class="grid">
+    <div class="card">
+      <h3>Auth</h3>
+      <label>API Token</label>
+      <input id="token" placeholder="Bearer token"/>
+      <label>Org ID</label>
+      <input id="org" placeholder="org-123"/>
+      <button onclick="saveAuth()">Use</button>
+    </div>
+
+    <div class="card">
+      <h3>Keys</h3>
+      <button onclick="listKeys()">List Keys</button>
+      <label>Revoke key_hash</label>
+      <input id="revoke_hash" placeholder="sha256 hash"/>
+      <button onclick="revokeKey()">Revoke</button>
+      <pre id="keys"></pre>
+    </div>
+
+    <div class="card">
+      <h3>Usage</h3>
+      <button onclick="getUsage()">Refresh</button>
+      <pre id="usage"></pre>
+    </div>
+
+    <div class="card">
+      <h3>Personas</h3>
+      <button onclick="listPersonas()">List</button>
+      <label>Import JSON</label>
+      <textarea id="persona_json" rows="6" placeholder='{"name":"writer","traits":[...]}'></textarea>
+      <button onclick="importPersona()">Import</button>
+      <label>Export persona_id</label>
+      <input id="persona_id" placeholder="per_xxx"/>
+      <button onclick="exportPersona()">Export</button>
+      <pre id="personas"></pre>
+    </div>
+  </div>
+
+  <script>
+    function headers(requireOrg=true){
+      const h={'Content-Type':'application/json'};
+      const t=localStorage.getItem('api_token')||'';
+      if(t) h['Authorization']='Bearer '+t;
+      const org=localStorage.getItem('org_id')||'';
+      if(requireOrg && org) h['X-Org-Id']=org;
+      return h;
+    }
+    function saveAuth(){ localStorage.setItem('api_token',document.getElementById('token').value.trim()); localStorage.setItem('org_id',document.getElementById('org').value.trim()); alert('Saved'); }
+    async function listKeys(){ const r=await fetch('/keys',{headers:headers()}); document.getElementById('keys').textContent=await r.text(); }
+    async function revokeKey(){ const h=document.getElementById('revoke_hash').value.trim(); const r=await fetch('/keys/'+encodeURIComponent(h),{method:'DELETE',headers:headers()}); alert(await r.text()); listKeys(); }
+    async function getUsage(){ const r=await fetch('/usage',{headers:headers()}); document.getElementById('usage').textContent=await r.text(); }
+    async function listPersonas(){ const r=await fetch('/persona',{headers:headers()}); document.getElementById('personas').textContent=await r.text(); }
+    async function importPersona(){ const txt=document.getElementById('persona_json').value; const r=await fetch('/persona/import',{method:'POST',headers:headers(),body:txt}); alert(await r.text()); listPersonas(); }
+    async function exportPersona(){ const id=document.getElementById('persona_id').value.trim(); const r=await fetch('/persona/export/'+encodeURIComponent(id),{headers:headers()}); alert(await r.text()); }
+  </script>
+</body>
+</html>

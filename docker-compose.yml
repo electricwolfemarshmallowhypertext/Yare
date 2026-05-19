@@ -1,0 +1,63 @@
+version: "3.9"
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  memory:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      ENV: "production"
+      LOG_LEVEL: "INFO"
+      REDIS_URL: "redis://redis:6379/0"
+      SQLITE_PATH: "/data/memory/fallback.db"
+      METRICS_PORT: "9090"
+      REQUEST_MAX_BYTES: "10485760"
+      RATE_LIMIT_MAX: "120"
+      RATE_LIMIT_WINDOW_SEC: "60"
+      RATE_LIMIT_IP_MAX: "300"
+      RATE_LIMIT_IP_WINDOW_SEC: "60"
+      ALLOWED_ORIGINS: "*"
+      TRUSTED_HOSTS: "*"
+      PROXY_COUNT: "1"
+      # secrets via *_FILE
+      API_KEYS_FILE: "/run/secrets/api_keys"
+      ENCRYPTION_KEY_PATH: "/run/secrets/fernet_key"
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+      - "9090:9090"
+    volumes:
+      - app-data:/data
+    secrets:
+      - api_keys
+      - fernet_key
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+secrets:
+  api_keys:
+    file: ./secrets/api_keys.txt
+  fernet_key:
+    file: ./secrets/fernet.key
+
+volumes:
+  app-data:
+  redis-data:

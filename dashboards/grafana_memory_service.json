@@ -1,0 +1,54 @@
+{
+  "title": "Memory Service",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "10s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Inflight Requests",
+      "targets": [
+        {"expr": "memory_inflight_requests"}
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache Hits vs Misses",
+      "targets": [
+        {"expr": "sum(rate(memory_cache_hits_total[5m]))"},
+        {"expr": "sum(rate(memory_cache_misses_total[5m]))"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "DB Ops by Status",
+      "targets": [
+        {"expr": "sum by (op,status) (rate(memory_db_operations_total[5m]))"}
+      ],
+      "legend": { "show": true }
+    },
+    {
+      "type": "timeseries",
+      "title": "DB Operation Duration (p95)",
+      "targets": [
+        {"expr": "histogram_quantile(0.95, sum by (le, op) (rate(memory_db_operation_seconds_bucket[5m])))"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Rate Limit Decisions",
+      "targets": [
+        {"expr": "sum by (decision) (rate(memory_rate_limit_decisions_total[5m]))"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Auth Decisions",
+      "targets": [
+        {"expr": "sum by (decision,reason) (rate(memory_auth_decisions_total[5m]))"}
+      ]
+    }
+  ]
+}

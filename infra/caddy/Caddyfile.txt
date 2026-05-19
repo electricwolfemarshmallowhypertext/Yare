@@ -1,0 +1,32 @@
+# Caddy reverse proxy with automatic TLS (Let's Encrypt)
+# Set DOMAIN and EMAIL as env or replace literals.
+
+{
+    email {$EMAIL}
+}
+
+{$DOMAIN} {
+    encode gzip zstd
+
+    @api {
+        path /health*
+        path /memories*
+        path /metrics*
+        path /context*
+        path /transfer*
+    }
+
+    reverse_proxy @api 127.0.0.1:8000 {
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Forwarded-For {remote}
+    }
+
+    # Hard limits at edge (abuse control)
+    header {
+        # security headers
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        Content-Security-Policy "default-src 'none'"
+    }
+}

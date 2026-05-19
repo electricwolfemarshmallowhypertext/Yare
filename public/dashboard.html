@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Memory Service Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 20px; color: #111;}
+    h1 { font-size: 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; }
+    code { background: #f5f5f5; padding: 2px 4px; border-radius: 4px;}
+    .row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+    input[type="text"] { width: 420px; padding: 6px; }
+    button { padding: 6px 10px; }
+    .muted { color: #666; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Memory Service</h1>
+
+  <div class="row">
+    <label>API Key (optional for protected panels):</label>
+    <input id="token" type="text" placeholder="Bearer token (paste to enable protected panels)"/>
+    <button onclick="saveToken()">Use Token</button>
+    <span class="muted">Public: Health, Status. Protected: Risks, Personas.</span>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Health</h3>
+      <pre id="health">loading...</pre>
+    </div>
+    <div class="card">
+      <h3>Status</h3>
+      <pre id="status">loading...</pre>
+    </div>
+    <div class="card">
+      <h3>Risks</h3>
+      <pre id="risks">requires token</pre>
+    </div>
+    <div class="card">
+      <h3>Personas</h3>
+      <pre id="personas">requires token</pre>
+    </div>
+  </div>
+  <p>Endpoints: <code>/metrics</code> • <code>/status</code> • <code>/memories</code> • <code>/persona</code> • <code>/orchestrations</code></p>
+  <p>AgentMD: <a href="/dashboard/agentmd-results.html"><code>/dashboard/agentmd-results.html</code></a> • <code>/agentmd/results</code></p>
+
+  <script>
+    function getToken() { return localStorage.getItem('api_token') || ''; }
+    function saveToken() {
+      const t = document.getElementById('token').value.trim();
+      if (t) localStorage.setItem('api_token', t);
+      refresh();
+    }
+    async function fetchJSON(path, requireAuth=false) {
+      const headers = { 'Content-Type': 'application/json' };
+      const token = getToken();
+      if (requireAuth && token) headers['Authorization'] = 'Bearer ' + token;
+      if (requireAuth && !token) throw new Error('missing token');
+      const res = await fetch(path, { headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    }
+    async function refresh() {
+      try { document.getElementById('health').textContent = JSON.stringify(await fetchJSON('/health'), null, 2); } catch(e) {}
+      try { document.getElementById('status').textContent = JSON.stringify(await fetchJSON('/status'), null, 2); } catch(e) {}
+      try { document.getElementById('risks').textContent = JSON.stringify(await fetchJSON('/risks', true), null, 2); } catch(e) { document.getElementById('risks').textContent = e+''; }
+      try { document.getElementById('personas').textContent = JSON.stringify(await fetchJSON('/persona', true), null, 2); } catch(e) { document.getElementById('personas').textContent = e+''; }
+    }
+    (function init(){ const t = getToken(); if (t) document.getElementById('token').value = t; refresh(); setInterval(refresh, 10000); })();
+  </script>
+</body>
+</html>

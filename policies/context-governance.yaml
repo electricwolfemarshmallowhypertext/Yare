@@ -1,0 +1,11 @@
+id: policy.context-governance.v1
+version: 1
+rules:
+  - id: block-persona-marketplace-scope
+    severity: high
+    action: warn
+    statement: Persona marketplace work is out of scope for AgentMD v1.
+  - id: require-receipt-auditability
+    severity: high
+    action: enforce
+    statement: All agent runs must emit receipts with context hashes and validation state.

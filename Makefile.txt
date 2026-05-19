@@ -1,0 +1,19 @@
+.PHONY: test test-integration migrate backup load preflight
+
+test:
+\tpytest -q
+
+test-integration:
+\tpytest -q tests/integration
+
+migrate:
+\tpython scripts/migrate.py --db $${SQLITE_PATH:-data/memory/fallback.db} --migrations migrations
+
+backup:
+\tpython scripts/backup_sqlite.py --db $${SQLITE_PATH:-data/memory/fallback.db} --out $${BACKUP_DIR:-data/backups} --retention $${RETENTION:-7}
+
+load:
+\tk6 run scripts/load/k6_memory.js
+
+preflight:
+\tbash scripts/preflight.sh $(MODE)

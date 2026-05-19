@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "sticky.fullname" . }}-config
+data:
+  ENV: {{ .Values.env.ENV | quote }}
+  LOG_LEVEL: {{ .Values.env.LOG_LEVEL | quote }}
+  REQUEST_MAX_BYTES: {{ .Values.env.REQUEST_MAX_BYTES | quote }}
+  REDIS_URL: {{ .Values.env.REDIS_URL | quote }}
+  {{- if .Values.env.DATABASE_URL }}
+  DATABASE_URL: {{ .Values.env.DATABASE_URL | quote }}
+  {{- end }}
+  METRICS_PORT: {{ .Values.service.metricsPort | quote }}
+  ALLOWED_ORIGINS: {{ .Values.env.ALLOWED_ORIGINS | quote }}
+  TRUSTED_HOSTS: {{ .Values.env.TRUSTED_HOSTS | quote }}
+  PROXY_COUNT: {{ .Values.env.PROXY_COUNT | quote }}
+  RATE_PLANS: {{ .Values.env.RATE_PLANS | quote }}

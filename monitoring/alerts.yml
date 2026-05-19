@@ -1,0 +1,24 @@
+groups:
+- name: memory-service
+  rules:
+  - alert: HighErrorRate
+    expr: sum(rate(http_server_errors_total[5m])) > 1
+    for: 2m
+    labels:
+      severity: page
+    annotations:
+      summary: "High HTTP 5xx rate"
+  - alert: RateLimitedSpike
+    expr: sum(rate(memory_rate_limit_decisions_total{decision=\"block\"}[5m])) > 5
+    for: 5m
+    labels:
+      severity: warn
+    annotations:
+      summary: "Spike in rate-limited requests"
+  - alert: DBErrorSpike
+    expr: sum(rate(memory_db_operations_total{status=\"error\"}[5m])) > 2
+    for: 2m
+    labels:
+      severity: page
+    annotations:
+      summary: "Database operation errors increased"

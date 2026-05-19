@@ -1,0 +1,14 @@
+﻿venv/
+__pycache__/
+.pytest_cache/
+.tmp/
+*.pyc
+.env
+.env.*
+!.env.example
+secrets/
+receipts/*.jsonl
+.agentmd/resolved-context.json
+node_modules/
+dist/
+build/

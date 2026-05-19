@@ -1,0 +1,5 @@
+{
+  "geo": { "enabled": true, "maxmind_db_path": "${MAXMIND_DB_PATH}" },
+  "ethics": { "enabled": true, "rules_path": "${ETHICS_RULES_PATH}" },
+  "risk": { "enabled": true, "detectors": ["inactivity", "deadline", "burstiness", "negative-trend", "preference-contradiction", "content-outliers"] }
+}
