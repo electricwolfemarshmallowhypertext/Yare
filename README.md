@@ -279,14 +279,6 @@ Those are later layers. v0.1 proves the core runtime:
 validate → resolve → hash → receipt → explain
 ```
 
-## Sticky compatibility
-
-This repo began from Sticky runtime work.
-
-Existing Sticky persona assets are not removed. In AgentMD framing, they become hidden internal **behavioral architecture packs**.
-
-They are not surfaced in the v0.1 product UI. They may become v2/v3 policy/personality/context packs after the governance runtime is stable.
-
 ## Repository status
 
 Current verified state:
