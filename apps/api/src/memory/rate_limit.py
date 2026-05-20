@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import time
-from typing import Optional
+from typing import Any, Optional
 
 import redis
-from redis.client import Script
 import structlog
 
 from .retry import retry
@@ -52,7 +51,7 @@ class RateLimiter:
         self.redis = redis.from_url(redis_url, decode_responses=False)
         # Preload script
         try:
-            self.lua: Script = self.redis.register_script(LUA_FIXED_WINDOW)
+            self.lua: Any = self.redis.register_script(LUA_FIXED_WINDOW)
         except Exception as e:
             logger.warning("rate_limit_lua_register_failed", error=str(e))
             self.lua = None  # type: ignore

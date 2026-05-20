@@ -217,7 +217,7 @@ def create_app() -> FastAPI:
     async def _shutdown():
         # Stop scheduler tasks
         try:
-            app.state.scheduler.stop()
+            await app.state.scheduler.stop()
         except Exception:
             pass
         # Close Redis

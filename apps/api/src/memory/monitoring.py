@@ -5,11 +5,21 @@ Prometheus endpoint + optional OpenTelemetry tracing.
 from typing import Optional
 import structlog
 from prometheus_client import start_http_server
-from opentelemetry import trace
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+try:
+    from opentelemetry import trace
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    OTEL_AVAILABLE = True
+except Exception:
+    trace = None  # type: ignore[assignment]
+    Resource = None  # type: ignore[assignment]
+    TracerProvider = None  # type: ignore[assignment]
+    OTLPSpanExporter = None  # type: ignore[assignment]
+    BatchSpanProcessor = None  # type: ignore[assignment]
+    OTEL_AVAILABLE = False
 
 logger = structlog.get_logger("memory.monitoring")
 
@@ -27,6 +37,9 @@ class Monitoring:
             logger.warning("prometheus_start_failed", error=str(e))
 
         if self.otlp_endpoint:
+            if not OTEL_AVAILABLE:
+                logger.warning("otel_tracing_unavailable", reason="missing_opentelemetry_dependency")
+                return
             try:
                 resource = Resource.create({"service.name": service_name, "deployment.environment": env})
                 provider = TracerProvider(resource=resource)
