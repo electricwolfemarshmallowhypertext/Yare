@@ -1,4 +1,4 @@
-# AgentMD Runtime
+﻿# AgentMD Runtime
 
 **AgentMD is a context governance runtime for AI agents.**
 
@@ -25,12 +25,12 @@ AgentMD turns agent context into a verifiable runtime surface.
 
 ```text
 task
-  → validate workspace
-  → resolve relevant context
-  → hash selected context bundle
-  → run or prepare agent execution
-  → write receipt
-  → show explainable results
+  â†’ validate workspace
+  â†’ resolve relevant context
+  â†’ hash selected context bundle
+  â†’ run or prepare agent execution
+  â†’ write receipt
+  â†’ show explainable results
 ```
 
 ## What AgentMD governs
@@ -276,11 +276,19 @@ AgentMD v0.1 does not include:
 Those are later layers. v0.1 proves the core runtime:
 
 ```text
-validate → resolve → hash → receipt → explain
+validate â†’ resolve â†’ hash â†’ receipt â†’ explain
 ```
 
-## Repository status
+## License
 
+AgentMD Runtime is source-available under **Business Source License 1.1 (BUSL-1.1)**.
+
+Commercial production use, hosted service use, resale, embedding into commercial
+products, or offering substantially similar functionality as a service requires a
+commercial license from the Licensor.
+
+See `LICENSE`, `LICENSE.md`, and `NOTICE` for details.
+## Repository status
 Current verified state:
 
 ```text
@@ -314,3 +322,4 @@ What policy applied?
 What changed?
 What receipt proves it?
 ```
+
