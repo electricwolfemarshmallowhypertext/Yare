@@ -86,6 +86,29 @@ def _bundle_hash(selected_items: list[dict[str, Any]]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _resolved_pointer_path(root: Path) -> Path:
+    return root / ".agentmd" / "last-resolved-path.txt"
+
+
+def _write_resolved_pointer(root: Path, resolved_path: Path) -> None:
+    ptr = _resolved_pointer_path(root)
+    ptr.parent.mkdir(parents=True, exist_ok=True)
+    ptr.write_text(str(resolved_path.resolve()), encoding="utf-8")
+
+
+def _read_resolved_pointer(root: Path) -> Path | None:
+    ptr = _resolved_pointer_path(root)
+    if not ptr.exists():
+        return None
+    raw = ptr.read_text(encoding="utf-8", errors="replace").strip()
+    if not raw:
+        return None
+    p = Path(raw)
+    if not p.is_absolute():
+        p = (root / p).resolve()
+    return p
+
+
 def _display_path(root: Path, path: Path) -> str:
     try:
         return path.resolve().relative_to(root.resolve()).as_posix()
@@ -462,7 +485,9 @@ def resolve_context(root: Path, task: str, output_path: Path | None = None) -> t
         out_path = root / out_path
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(output, indent=2), encoding="utf-8")
-    return output, out_path.resolve()
+    resolved_out = out_path.resolve()
+    _write_resolved_pointer(root, resolved_out)
+    return output, resolved_out
 
 
 def _run_git(root: Path, args: list[str]) -> tuple[bool, str]:
@@ -513,14 +538,25 @@ def _git_state(root: Path) -> dict[str, Any]:
     }
 
 
-def _load_resolved(root: Path) -> dict[str, Any] | None:
-    path = root / ".agentmd" / "resolved-context.json"
-    if not path.exists():
-        return None
-    try:
-        return json.loads(_load_text(path))
-    except Exception:
-        return None
+def _load_resolved(root: Path) -> tuple[dict[str, Any] | None, Path | None]:
+    candidates: list[Path] = []
+    ptr_path = _read_resolved_pointer(root)
+    if ptr_path is not None:
+        candidates.append(ptr_path)
+    candidates.append(root / ".agentmd" / "resolved-context.json")
+    seen: set[str] = set()
+    for path in candidates:
+        key = str(path.resolve())
+        if key in seen:
+            continue
+        seen.add(key)
+        if not path.exists():
+            continue
+        try:
+            return json.loads(_load_text(path)), path.resolve()
+        except Exception:
+            continue
+    return None, None
 
 
 def write_receipt(
@@ -531,7 +567,7 @@ def write_receipt(
     phase: str | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     validation = validate_workspace(root)
-    resolved = _load_resolved(root)
+    resolved, resolved_path = _load_resolved(root)
     git = _git_state(root)
 
     selected_context: list[dict[str, Any]] = []
@@ -560,7 +596,7 @@ def write_receipt(
         "adapter": adapter,
         "phase": phase,
         "command_run": command_run,
-        "resolved_context_file": ".agentmd/resolved-context.json" if resolved else None,
+        "resolved_context_file": _display_path(root, resolved_path) if resolved_path else None,
         "selected_context_files": selected_context,
         "file_hashes": file_hashes,
         "context_bundle_hash": context_bundle_hash,

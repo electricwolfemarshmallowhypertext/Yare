@@ -232,3 +232,31 @@ def test_receipt_includes_git_or_non_git_metadata(ws: Path) -> None:
     else:
         assert payload["git_reason"] == "not_a_git_repository"
         assert payload["git_commit"] is None
+
+
+def test_receipt_uses_last_custom_resolved_output(ws: Path) -> None:
+    scaffold_workspace(ws)
+    custom_output = ws / "custom" / "resolved.json"
+    resolve_result = runner.invoke(
+        app,
+        [
+            "resolve",
+            "--root",
+            str(ws),
+            "--task",
+            "review this repo for context drift",
+            "--output",
+            str(custom_output),
+        ],
+    )
+    assert resolve_result.exit_code == 0
+    assert custom_output.exists()
+
+    receipt_result = runner.invoke(app, ["receipt", "--root", str(ws)])
+    assert receipt_result.exit_code == 0
+
+    receipt_files = sorted((ws / "receipts").glob("*.jsonl"))
+    payload = json.loads(receipt_files[-1].read_text(encoding="utf-8").strip())
+    assert payload["resolved_context_file"] == "custom/resolved.json"
+    assert payload["selected_context_files"], "receipt should include selected context from last custom resolved output"
+    assert payload["context_bundle_hash"]
