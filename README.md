@@ -1,322 +1,324 @@
-Usage:
+# AgentMD Runtime
 
-CLI: python -m cli.sticky config --base-url http://localhost:8000 --token YOUR_KEY --org-id org-123
-Then run commands like: python -m cli.sticky health
+**AgentMD is a context governance runtime for AI agents.**
 
-# Project status: original outline vs. current, and exactly what’s left to go live (VPS)
+It makes `AGENTS.md`, skills, memory, policies, evals, and execution receipts executable, versioned, and auditable.
 
-Below is a precise map from the original outline to what exists now, plus a clear go-live checklist. No omissions.
+AgentMD is not a notes app, persona marketplace, or prompt-pack wrapper. It is a local-first runtime for governing the context agents use before, during, and after execution.
 
-## 1) Original outline → current implementation status
+## Problem
 
-Core runtime
-- Server/API
-  - Status: Complete
-  - Files: src/memory/server.py, src/memory/http_metrics.py, src/memory/logging_config.py
-  - Notes: Request size limits, CORS, trusted hosts, gzip, HTTP metrics, health endpoint
-- Config
-  - Status: Complete
-  - Files: src/memory/config.py
-  - Notes: Env + secrets via *_FILE, safe dir creation, consistent settings, tiered rate plans, registration token
-- Models/Validation
-  - Status: Complete
-  - Files: src/memory/models.py, src/memory/validation.py
-- Exceptions
-  - Status: Complete
-  - File: src/memory/exceptions.py
-- Utils
-  - Status: Complete
-  - File: src/memory/utils.py
+Production AI teams increasingly rely on assembled context stacks: repo instructions, skill files, memory notes, policies, evals, local docs, CLI agents, and model-specific workflows.
 
-Data/persistence
-- SQLite store
-  - Status: Complete
-  - File: src/memory/persistence.py
-- Postgres store (prod-ready option)
-  - Status: Complete
-  - Files: src/memory/persistence_pg.py, src/memory/persistence_factory.py
-  - Notes: SQLAlchemy Core, upsert, indexes, factory switch via POSTGRES_URL/DATABASE_URL
+The failure point is not only retrieval. It is context governance:
 
-Caching and limits
-- Redis cache (app cache, embeddings LRU)
-  - Status: Complete
-  - File: src/memory/cache.py
-- Rate limiting (sliding window)
-  - Status: Complete
-  - File: src/memory/rate_limit.py
+- stale instructions
+- conflicting skills
+- unmanaged memory
+- invisible context selection
+- unaudited execution
+- no reproducible trace of why an agent acted
 
-Security and ethics
-- API keys + RBAC
-  - Status: Complete
-  - File: src/memory/security.py
-- Ethical policy checks
-  - Status: Complete (baseline)
-  - File: src/memory/ethics.py
-- Security headers (CSP nonce)
-  - Status: Complete
-  - File: src/memory/security_headers.py
+AgentMD turns agent context into a verifiable runtime surface.
 
-Crypto and compression
-- Encryption (Fernet, key rotate, save/load)
-  - Status: Complete
-  - File: src/memory/encryption.py
-- Compression (Zstd + dict training)
-  - Status: Complete
-  - File: src/memory/compression.py
+## Core idea
 
-Observability
-- Metrics (Prometheus)
-  - Status: Complete
-  - File: src/memory/metrics.py
-- Tracing (OTEL optional)
-  - Status: Complete
-  - File: src/memory/monitoring.py
-- HTTP metrics middleware
-  - Status: Complete
-  - File: src/memory/http_metrics.py
-- Dashboards/alerts
-  - Status: Complete (baseline)
-  - Files: dashboards/grafana_memory_service.json, monitoring/alerts.yml, docs/OBSERVABILITY_GRAFANA.md, monitoring/prometheus.yml
+```text
+task
+  → validate workspace
+  → resolve relevant context
+  → hash selected context bundle
+  → run or prepare agent execution
+  → write receipt
+  → show explainable results
+```
 
-Higher-level features (the “20%”)
-- Cross-persona orchestration
-  - Status: Complete (baseline scheduler/graph + routes)
-  - Files: src/memory/orchestrator.py, src/memory/routes_orchestration.py
-- Self-reflection / analytics
-  - Status: Complete (baseline)
-  - Files: src/memory/analytics.py, src/memory/scheduler.py
-- Predictive/anticipatory risk flags
-  - Status: Complete (improved heuristics)
-  - File: src/memory/risk_engine.py
-- Ethical/interpretive engine
-  - Status: Complete (baseline rules)
-  - File: src/memory/ethics.py
+## What AgentMD governs
 
-Public pages and self-service
-- Public status page (/status)
-  - Status: Complete
-  - File: src/memory/status.py (registry snapshot)
-- Mini dashboard (/dashboard)
-  - Status: Complete (static HTML)
-  - File: public/dashboard.html
-- Admin UI (/admin)
-  - Status: Complete (static HTML for keys/personas/usage)
-  - File: public/admin.html
-- API key self-service (/register, /keys, DELETE /keys/{hash})
-  - Status: Complete
-  - Files: src/memory/api_keys_store.py, server routes in src/memory/server.py
-  - Notes: Registration requires X-Registration-Token; keys stored hashed; supports tiers
-- Tiered rate plans (basic/pro/partner)
-  - Status: Complete
-  - File: src/memory/config.py (RATE_PLANS), server dynamic rate limiting
-- Usage metering (per-key, per-route, daily)
-  - Status: Complete
-  - File: src/memory/metering.py; admin endpoint /usage
+```text
+AGENTS.md                  repo-level operating rules
+agentmd.yaml               AgentMD workspace config
+skills/*/SKILL.md          procedural agent capabilities
+memory/*.md                durable project/context memory
+policies/*.yaml            governance and permission rules
+evals/*.jsonl              context-selection/evaluation fixtures
+receipts/*.jsonl           auditable execution receipts
+.agentmd/resolved-context.json
+                            latest explainable context bundle
+```
 
-Multitenancy / orgs
-- Org scoping via X-Org-Id header
-  - Status: Complete (baseline enforcement in protected routes)
-  - Files: src/memory/org_context.py, changes in src/memory/server.py, schema updates in Alembic 004
-  - Notes: Keys can be bound to org_id; store entities carry org_id
+## Current v0.1 capabilities
 
-Data import/export and search
-- Bulk export/import (NDJSON)
-  - Status: Complete
-  - File: src/memory/routes_data.py
-  - Endpoints: GET /data/export, POST /data/import
-- Advanced search (baseline text LIKE) + ETag on reads
-  - Status: Complete (baseline)
-  - File: src/memory/routes_data.py
-  - Endpoints: GET /data/search, GET /data/memories/{id} with ETag
+### CLI
 
-Geo/IP risk (optional)
-- Basic IP geo risk scoring
-  - Status: Complete (optional)
-  - File: src/memory/geo_risk.py
-  - Notes: Uses MaxMind DB if provided (MAXMIND_DB_PATH)
+AgentMD currently provides four core commands:
 
-Deployment and operations
-- Containerization
-  - Status: Complete
-  - Files: Dockerfile, docker-compose.yml (Redis), docker-compose.pg.yml (Postgres + migrator)
-- Helm/K8s chart (+ optional Argo Rollouts and PgBouncer)
-  - Status: Complete
-  - Files: charts/sticky/* (Deployment/Service/Ingress/HPA, optional Rollout, PgBouncer)
-- Secrets handling
-  - Status: Complete (files + *_FILE env)
-  - Files: secrets/README.txt, .env.example
-- Backups and migrations
-  - Status: Complete (scripts + Alembic + autogenerate)
-  - Files: scripts/backup_sqlite.py, scripts/restore_sqlite.py, scripts/migrate.py
-  - Alembic: alembic.ini, alembic/env.py, alembic/versions/001_init_memories_projects.py, 002_autogen_example.py, 003_add_personas.py, 004_add_orgs_and_org_columns.py
-  - Autogenerate helper: scripts/alembic_autogen.sh
-- TLS/Ingress runbook
-  - Status: Complete (runbook + Caddyfile provided earlier)
-  - Files: Caddyfile, docs/TLS_SYSTEMD.md
-- CI local (no GitHub)
-  - Status: Complete
-  - Files: scripts/ci_local.sh, scripts/preflight.sh
-- Load/Fuzz testing
-  - Status: Complete
-  - Files: scripts/load/k6_memory.js, scripts/fuzz_http.py
+```powershell
+.\agentmd.cmd doctor
+.\agentmd.cmd resolve --task "review this repo for context drift"
+.\agentmd.cmd receipt
+.\agentmd.cmd run --adapter codex --task "review this repo for context drift"
+```
 
-CLI client
-- Developer CLI
-  - Status: Complete
-  - Files: cli/sticky.py, requirements-cli.txt
+### `doctor`
 
-Tests
-- Unit tests (modules)
-  - Status: Complete (encryption, compression, validation, utils)
-  - Files: tests/memory/test_encryption.py, tests/memory/test_compression.py, tests/memory/test_validation.py, tests/memory/test_utils.py
-- Integration tests (server)
-  - Status: Complete (baseline)
-  - File: tests/integration/test_server.py
-- Security/fuzz/chaos
-  - Status: Fuzz included (scripts/fuzz_http.py). Chaos tests recommended post-go-live.
+Validates the workspace:
 
-Docs
-- Deployment, observability, orchestration, TLS/systemd, API
-  - Status: Complete
-  - Files: docs/DEPLOYMENT.md, docs/OBSERVABILITY.md, docs/OBSERVABILITY_GRAFANA.md, docs/ORCHESTRATION.md, docs/TLS_SYSTEMD.md, docs/REMAINING_GAPS.md, docs/API.md
+- required files and directories
+- `AGENTS.md`
+- `agentmd.yaml`
+- skill metadata
+- duplicate skill IDs
+- forbidden skill permissions
+- YAML policies
+- JSONL evals
+- markdown-only memory files
+- broken local references
+- context size limits
 
-Dependencies
-- Requirements pinned
-  - Status: Complete
-  - Files: requirements.txt, requirements-dev.txt, requirements-cli.txt
+JSON output is supported:
 
-Package
-- Inits
-  - Status: Complete
-  - Files: src/__init__.py, src/memory/__init__.py
+```powershell
+.\agentmd.cmd doctor --json
+```
 
-## 2) What’s done (high level checklist)
+### `resolve`
 
-- Core API server with security, dynamic rate limits, metrics, tracing hooks
-- Redis cache + LRU; SQLite and Postgres persistence (toggle via POSTGRES_URL/DATABASE_URL)
-- Orchestrator + routes, analytics + scheduler, ethics engine, risk engine
-- Encryption, compression, validation/models, utils, exceptions, logging config
-- Dockerfile, compose (Redis), compose with Postgres + migrator (Alembic)
-- Backups (SQLite), restore, migrations (scripted + Alembic autogenerate path)
-- HTTP metrics, dashboards, alerts, observability docs
-- Local CI script, unit + integration tests, fuzz and k6 load script
-- Public status page, mini dashboard, Admin UI, API key self-service, tiered plans, usage metering
-- Multitenancy with org scoping and org-bound API keys
-- Bulk NDJSON import/export, baseline search, ETag on GET
-- CSP nonce middleware, optional geo IP risk enrichment
-- Helm/K8s chart with HPA; optional Argo Rollouts canary/blue‑green; optional PgBouncer
-- CLI client for dev ops
-- Requirements pinned
+Selects context for a task and explains why each file was selected or excluded.
 
-## 3) What’s left to do to go live on a VPS
+```powershell
+.\agentmd.cmd resolve --task "review this repo for context drift"
+```
 
-Pick one of two DB options:
-- Option A: SQLite (simplest single-node)
-  - Use docker-compose.yml (Redis + app)
-  - Pros: fastest to run; Cons: single-writer constraints, not ideal for scale
-- Option B: Postgres (recommended for production)
-  - Use docker-compose.pg.yml (adds Postgres + migration container)
-  - Pros: scalable writes and concurrency; Cons: one more service to manage
+Custom output path:
 
-Minimal go-live checklist (exact steps)
-1) Preflight (local or on VPS)
-- bash scripts/preflight.sh
-  - Runs lint, types, tests, security checks, builds image, brings up stack, waits for health, fuzzes, optional k6.
+```powershell
+.\agentmd.cmd resolve --task "review this repo for context drift" --output .agentmd\resolved-custom.json
+```
 
-2) Create dirs and secrets (if not using deploy script)
-- mkdir -p secrets data/backups
-- secrets/api_keys.txt: one line: YOUR_API_KEY:admin|*
-- secrets/fernet.key: run locally: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+JSON output:
 
-3) Choose compose file and start
-- SQLite path:
-  - docker compose up -d --build
-- Postgres path:
-  - docker compose -f docker-compose.pg.yml up -d --build
+```powershell
+.\agentmd.cmd resolve --task "review this repo for context drift" --json
+```
 
-Or, one-liner deploy
-- bash scripts/deploy.sh           # SQLite path
-- bash scripts/deploy.sh pg        # Postgres path
+Resolved context includes:
 
-4) Verify health and metrics
-- curl -fsS http://YOUR_HOST:8000/health
-- Visit http://YOUR_HOST:9090/metrics
+- task
+- selected context files
+- excluded context files
+- selection reasons
+- exclusion reasons
+- file hashes
+- estimated token/size data
+- deterministic `context_bundle_hash`
 
-5) Sanity test an API key call (include org if enabled)
-- curl -H "Authorization: Bearer YOUR_API_KEY" -H "X-Org-Id: ORG_ID" http://YOUR_HOST:8000/memories/NON_EXISTENT_ID
+### `receipt`
 
-6) Optional TLS/Ingress
-- Use Caddyfile and docs/TLS_SYSTEMD.md (reverse proxy with TLS)
+Writes an auditable execution receipt.
 
-7) Optional dashboards/alerts
-- Import dashboards/grafana_memory_service.json into Grafana
-- Load monitoring/alerts.yml (and monitoring/prometheus.yml) into Prometheus
+```powershell
+.\agentmd.cmd receipt
+```
 
-8) Optional load test (spot check)
-- BASE_URL=http://YOUR_HOST:8000 API_TOKEN=YOUR_API_KEY k6 run scripts/load/k6_memory.js
+Receipts include:
 
-## 4) Known limitations and honest flags
+- task
+- adapter
+- selected context files
+- file hashes
+- context bundle hash
+- resolved context source file
+- git commit
+- dirty status
+- changed files
+- untracked files
+- validation status
+- deterministic receipt hash
 
-- Security auth is API-key + RBAC (no OAuth/SSO yet)
-- Orchestrator/analytics/ethics/risk are baseline logic (safe, extendable)
-- Chaos testing suite and pen tests are recommended as a follow-up
-- For multi-writer/high-throughput use Postgres; move to managed Postgres/Redis for production posture
-- Consider secret manager (Vault/AWS/GCP) and key rotation cadence post-launch
-- Search is baseline LIKE; consider Postgres FTS or external search later
+### `run`
 
-## 5) Quick file map for deployment-critical assets
+Prepares an adapter run for supported agent CLIs.
 
-- Runtime: src/memory/server.py, config.py, http_metrics.py, metrics.py, monitoring.py, security_headers.py
-- Data: persistence.py (SQLite), persistence_pg.py + persistence_factory.py (PG)
-- Multitenancy/Data routes: org_context.py, routes_data.py, geo_risk.py
-- Infra: Dockerfile, docker-compose.yml (SQLite), docker-compose.pg.yml (PG+Alembic)
-- Helm/K8s: charts/sticky/*
-- Secrets: secrets/ (api_keys.txt, fernet.key), .env.example
-- Ops: scripts/backup_sqlite.py, scripts/restore_sqlite.py, scripts/migrate.py, alembic/* (001..004), scripts/alembic_autogen.sh
-- Observability: dashboards/grafana_memory_service.json, monitoring/alerts.yml, monitoring/prometheus.yml, docs/OBSERVABILITY_GRAFANA.md
-- Tests/QA: tests/memory/*, tests/integration/test_server.py, scripts/load/k6_memory.js, scripts/fuzz_http.py
-- TLS/systemd runbook: docs/TLS_SYSTEMD.md, Caddyfile
-- CI local: scripts/ci_local.sh, scripts/preflight.sh
-- CLI: cli/sticky.py, requirements-cli.txt
-- Makefile: project root (test, migrate, backup, load, preflight)
+```powershell
+.\agentmd.cmd run --adapter codex --task "review this repo for context drift"
+.\agentmd.cmd run --adapter claude --task "review this repo for context drift"
+.\agentmd.cmd run --adapter gemini --task "review this repo for context drift"
+```
 
-## 6) Quickstart (local)
+v0.1 does not deeply integrate with each external agent runtime yet. It resolves context and records receipts around the intended execution path.
 
-- python -m venv .venv && source .venv/bin/activate
-- pip install -r requirements.txt -r requirements-dev.txt
-- uvicorn src.memory.server:app --host 0.0.0.0 --port 8000
-- curl http://localhost:8000/health
+## Explainable Results UI
 
-CLI quickstart
-- pip install -r requirements-cli.txt
-- python -m cli.sticky config --base-url http://localhost:8000 --token YOUR_KEY --org-id ORG_123
-- python -m cli.sticky health
+AgentMD includes a minimal explainable results dashboard.
 
-## 7) API reference (concise)
+Endpoint:
 
-See docs/API.md for full details.
+```text
+/agentmd/results
+```
 
-Key endpoints
-- Public: GET /health, GET /status, GET /dashboard, GET /admin
-- Auth: Bearer YOUR_API_KEY (from /register or secrets/api_keys.txt); org header X-Org-Id if multitenancy enforced
-- Self-service: POST /register (X-Registration-Token), GET /keys (admin), DELETE /keys/{hash} (admin), GET /usage (admin)
-- Core: POST /memories, GET /memories/{id}
-- Personas: GET /persona, POST /persona/import, GET /persona/export/{id}
-- Risks: GET /risks
-- Orchestrations: POST /orchestrations, GET /orchestrations/{id}, POST /orchestrations/{id}/cancel
-- Data: GET /data/export (NDJSON), POST /data/import (NDJSON), GET /data/search, GET /data/memories/{id} (ETag)
+Static UI:
 
-Environment switches
-- POSTGRES_URL or DATABASE_URL → use Postgres (PgBouncer DSN supported)
-- RATE_PLANS (JSON) → e.g. {"basic":{"limit":60,"window":60},"pro":{"limit":600,"window":60}}
-- REGISTRATION_TOKEN (or REGISTRATION_TOKEN_FILE) → enable /register
-- API_KEYS / API_KEYS_FILE → seed inline API keys
-- OTLP_ENDPOINT → enable tracing export
-- MAXMIND_DB_PATH → enable IP geo risk enrichment
+```text
+/dashboard/agentmd-results.html
+```
 
-## 8) K8s/Helm quickstart (optional)
+The UI shows:
 
-- helm install sticky charts/sticky --set image.repository=your-registry/memory-service --set image.tag=latest
-- To enable PgBouncer: --set pgbouncer.enabled=true --set env.DATABASE_URL="postgresql+psycopg2://memory:pass@pgbouncer:6432/memorydb"
-- To enable Ingress: --set ingress.enabled=true --set ingress.hosts[0].host=sticky.example.com
-- HPA is on by default; for canary/blue‑green, integrate Argo Rollouts and switch values.strategy.type
+- task
+- selected context files
+- why each file was selected
+- excluded files and reasons
+- validation status
+- context bundle hash
+- latest receipt hash
+- git commit
+- dirty status
+- changed/untracked files
+- file/change distribution
+- receipt integrity signals
+
+The page uses a clean enterprise layout and Chart.js visualizations. It does not add auth, database state, or platform behavior.
+
+## Quickstart
+
+From the repo root:
+
+```powershell
+cd E:\sticky-local-agentmd
+```
+
+Run validation:
+
+```powershell
+.\agentmd.cmd doctor
+```
+
+Resolve context:
+
+```powershell
+.\agentmd.cmd resolve --task "review this repo for context drift"
+```
+
+Write a receipt:
+
+```powershell
+.\agentmd.cmd receipt
+```
+
+Run tests:
+
+```powershell
+python -m pytest -q tests/agentmd/test_agentmd_cli.py
+```
+
+Expected current result:
+
+```text
+8 passed
+```
+
+## Server verification
+
+Start the FastAPI server:
+
+```powershell
+python -m uvicorn apps.api.src.memory.server:app --host 127.0.0.1 --port 8011
+```
+
+Check the AgentMD results endpoint:
+
+```powershell
+Invoke-WebRequest http://127.0.0.1:8011/agentmd/results
+```
+
+Check the dashboard page:
+
+```powershell
+Invoke-WebRequest http://127.0.0.1:8011/dashboard/agentmd-results.html
+```
+
+## Design principles
+
+AgentMD follows a file-native agent context model:
+
+1. **Context should be inspectable.**
+   Agents should not operate from invisible prompt soup.
+
+2. **Context should be versioned.**
+   Repo rules, memory, policies, and skills should live as files.
+
+3. **Context should be selected deliberately.**
+   The runtime should explain why context was included or excluded.
+
+4. **Context should be auditable.**
+   Every execution should produce a receipt.
+
+5. **Context should be portable.**
+   AgentMD should work across Codex, Claude, Gemini, local agents, and future adapters.
+
+## What v0.1 intentionally does not include
+
+AgentMD v0.1 does not include:
+
+- hosted SaaS
+- auth
+- team accounts
+- database-backed workspace state
+- persona marketplace
+- model marketplace
+- full adapter automation
+- enterprise policy UI
+- billing
+- remote sync
+
+Those are later layers. v0.1 proves the core runtime:
+
+```text
+validate → resolve → hash → receipt → explain
+```
+
+## Sticky compatibility
+
+This repo began from Sticky runtime work.
+
+Existing Sticky persona assets are not removed. In AgentMD framing, they become hidden internal **behavioral architecture packs**.
+
+They are not surfaced in the v0.1 product UI. They may become v2/v3 policy/personality/context packs after the governance runtime is stable.
+
+## Repository status
+
+Current verified state:
+
+```text
+doctor: PASS
+AgentMD tests: 8 passed
+remote: electricwolfemarshmallowhypertext/agentmd-runtime
+branch: main
+```
+
+Recent milestone commits:
+
+```text
+91210b9 add AgentMD explainable results UI
+973f411 fix AgentMD receipt source tracking
+c4d3aa4 harden AgentMD context governance CLI
+371a14f initial AgentMD Sticky runtime
+```
+
+## Positioning
+
+**AgentMD makes agent context executable.**
+
+It gives AI teams a local-first way to validate, resolve, version, hash, and audit the context their agents depend on.
+
+The result is a reproducible context trace:
+
+```text
+What did the agent use?
+Why did it use it?
+What policy applied?
+What changed?
+What receipt proves it?
+```
