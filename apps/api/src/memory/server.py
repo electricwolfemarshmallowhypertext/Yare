@@ -13,6 +13,7 @@ import shutil
 import json
 import httpx
 import asyncio
+from pathlib import Path
 
 from .config import settings
 from .logging_config import setup_logging
@@ -37,6 +38,7 @@ from .geo_risk import GeoRisk
 from .async_utils import maybe_await
 from .ethics import PolicyEngine
 from .watchdog import report as watchdog_report
+from cli.agentmd import validate_workspace
 
 logger = structlog.get_logger("memory.server")
 
@@ -318,20 +320,33 @@ def create_app() -> FastAPI:
                 resolved = {}
         latest_receipt = _load_latest_agentmd_receipt()
         selected = resolved.get("selected", []) if isinstance(resolved, dict) else []
+        excluded = resolved.get("excluded", []) if isinstance(resolved, dict) else []
         why_selected = [{"path": item.get("path"), "why": item.get("reason")} for item in selected]
+        why_excluded = [{"path": item.get("path"), "why": item.get("reason")} for item in excluded]
         validation = latest_receipt.get("validation") if latest_receipt else (resolved.get("validation", {}) if isinstance(resolved, dict) else {})
+        validation_summary = validate_workspace(Path(os.getcwd()))
         policy_warnings = []
         if isinstance(validation, dict):
             policy_warnings.extend(validation.get("errors", []))
             policy_warnings.extend(validation.get("warnings", []))
         return {
             "task": resolved.get("task") if isinstance(resolved, dict) else None,
-            "selected_context": [item.get("path") for item in selected],
+            "selected_context": selected,
             "why_selected": why_selected,
+            "excluded_context": excluded,
+            "why_excluded": why_excluded,
+            "context_bundle_hash": resolved.get("context_bundle_hash") if isinstance(resolved, dict) else None,
             "policy_warnings": policy_warnings,
             "receipt_hash": latest_receipt.get("receipt_hash") if latest_receipt else None,
+            "git_commit": latest_receipt.get("git_commit") if latest_receipt else None,
+            "git_dirty": latest_receipt.get("git_dirty") if latest_receipt else None,
             "changed_files": latest_receipt.get("changed_files", []) if latest_receipt else [],
+            "untracked_files": latest_receipt.get("untracked_files", []) if latest_receipt else [],
+            "file_hashes": latest_receipt.get("file_hashes", {}) if latest_receipt else {},
             "validation_status": validation,
+            "validation_summary": validation_summary,
+            "latest_receipt": latest_receipt,
+            "latest_resolved_context": resolved,
         }
 
     @app.get("/system/diagnostics")
