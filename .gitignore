@@ -14,3 +14,5 @@ dist/
 build/
 
 data/
+
+.agentmd/last-resolved-path.txt
