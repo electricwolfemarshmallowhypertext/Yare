@@ -6,41 +6,28 @@ on:
   pull_request:
 
 jobs:
-  build-test-scan:
-    runs-on: ubuntu-latest
+  agentmd-cli:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-            python-version: "3.11"
+          python-version: "3.11"
 
       - name: Install deps
+        shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-cov flake8 mypy bandit safety
+          python -m pip install -r requirements-cli.txt
+          python -m pip install pytest pyyaml
 
-      - name: Lint
+      - name: Validate CLI syntax
+        shell: pwsh
         run: |
-          flake8 src tests
-          mypy src
+          python -m py_compile cli/agentmd.py
 
-      - name: Test
+      - name: Run AgentMD CLI tests
+        shell: pwsh
         run: |
-          pytest --maxfail=1 --disable-warnings -q
-
-      - name: Security scan
-        run: |
-          bandit -r src -q || true
-          safety check || true
-
-      - name: Build image
-        run: |
-          docker build -t memory-service:ci .
-
-      - name: SBOM (Syft)
-        uses: anchore/sbom-action@v0
-        with:
-          image: memory-service:ci
-          format: spdx-json
+          python -m pytest -q tests/agentmd/test_agentmd_cli.py

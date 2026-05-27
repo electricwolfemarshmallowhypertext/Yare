@@ -42,6 +42,7 @@ jobs:
         with:
           name: agentmd-lead-proof
           if-no-files-found: error
+          include-hidden-files: true
           path: |
             .sticky/current-state.json
             .sticky/current-state.md
