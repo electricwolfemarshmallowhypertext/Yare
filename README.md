@@ -18,6 +18,7 @@
 - AgentMD tests: `20 passed`
 - Deterministic demo script: `scripts/demo-lead-compile.ps1`
 - Lead Artifact schema validation is enforced (`schemas/lead-artifact.schema.json`)
+- Technical proof note: `docs/proof_note.md`
 
 ## Problem
 
