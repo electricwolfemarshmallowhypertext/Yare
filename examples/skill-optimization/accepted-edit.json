@@ -1,0 +1,19 @@
+{
+  "schema_version": "skill-edit.v1",
+  "skill_id": "skill.demo.context-summary",
+  "skill_path": "examples/skill-optimization/original.skill.md",
+  "edit_id": "edit-accepted-001",
+  "edit_type": "replace",
+  "target": "Use this skill to summarize repository context.",
+  "replacement": "Use this skill to summarize repository context with explicit contradictions and verification gaps.",
+  "reason": "Improve precision on contradictions and unverified claims.",
+  "baseline_score": 0.62,
+  "validation_score": 0.74,
+  "validation_task": "Summarize context drift findings from receipts.",
+  "evidence": [
+    "eval:context-summary-heldout-1",
+    "metric:accuracy+0.12"
+  ],
+  "proposed_by": "agentmd-example",
+  "timestamp": "2026-05-27T00:00:00Z"
+}

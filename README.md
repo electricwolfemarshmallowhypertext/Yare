@@ -202,7 +202,15 @@ Run the demo:
 
 ### Future: controlled skill optimization
 
-NOT IMPLEMENTED: v0.3 direction is a controlled Skill Optimization loop for `skills/*/SKILL.md` using bounded text edits (add/delete/replace), held-out validation gates, accept-only-if-improved policy, and skill receipts. See `docs/skill_optimization.md`.
+PARTIALLY IMPLEMENTED: AgentMD now supports a bounded skill-edit gate (`add`/`delete`/`replace`) with held-out score acceptance and receipt/rejection records.
+
+Minimal command example:
+
+```powershell
+.\agentmd.cmd skill apply-edit --edit examples/skill-optimization/accepted-edit.json
+```
+
+NOT IMPLEMENTED: optimizer model, multi-epoch optimization loop, and benchmark harness. See `docs/skill_optimization.md`.
 
 ## Explainable Results UI
 
@@ -272,7 +280,7 @@ python -m pytest -q tests/agentmd/test_agentmd_cli.py
 Expected current result:
 
 ```text
-16 passed
+20 passed
 ```
 
 ## Server verification
@@ -357,7 +365,7 @@ Current verified state:
 
 ```text
 doctor: PASS
-AgentMD tests: 16 passed
+AgentMD tests: 20 passed
 remote: electricwolfemarshmallowhypertext/agentmd-runtime
 branch: main
 ```

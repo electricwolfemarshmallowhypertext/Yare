@@ -1,11 +1,11 @@
 # Skill Optimization (v0.3 Direction Stub)
 
-Status: **NOT IMPLEMENTED**
+Status: **PARTIALLY IMPLEMENTED**
 
 ## Purpose
 
-AgentMD treats `skills/*/SKILL.md` files as external agent state.  
-Future v0.3 should support controlled skill improvement with strict validation and auditability, without enabling uncontrolled self-evolving behavior.
+AgentMD treats `skills/*/SKILL.md` files as external agent state.
+v0.3 starts with a controlled skill-edit gate and keeps strict bounds to avoid uncontrolled self-evolving behavior.
 
 ## Core loop
 
@@ -42,9 +42,26 @@ This direction maps directly onto AgentMD primitives already in place:
 - deterministic hashes for state integrity
 - receipts for audit trace
 
-## Out of scope for v0.2
+## Implemented now
 
-- No optimizer runtime logic
-- No new CLI commands
-- No autonomous self-editing loop
-- No behavior changes to current v0.2 release candidate
+- `agentmd skill apply-edit --edit <path>` command.
+- Schema-validated edit payloads via `schemas/skill-edit.schema.json`.
+- Bounded edit operations only:
+  - add
+  - delete
+  - replace
+- Validation gate: accept only when `validation_score > baseline_score`.
+- Accepted edit path:
+  - updates skill file
+  - writes `.sticky/skill-receipts/*.jsonl`
+- Rejected edit path:
+  - does not update skill file
+  - writes `.sticky/rejected-skill-edits/*.jsonl`
+- Safe failure on missing or ambiguous target.
+
+## Not implemented yet
+
+- Optimizer model that proposes edits automatically.
+- Multi-epoch optimization loop over benchmark tasks.
+- Benchmark harness and broad evaluation suite.
+- Autonomous self-editing loop without explicit edit payloads.

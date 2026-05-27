@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 import subprocess
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -14,7 +15,9 @@ import yaml
 
 app = typer.Typer(add_completion=False, help="AgentMD context governance runtime CLI")
 lead_app = typer.Typer(add_completion=False, help="AI Work Lead primitives")
+skill_app = typer.Typer(add_completion=False, help="Skill optimization gates")
 app.add_typer(lead_app, name="lead")
+app.add_typer(skill_app, name="skill")
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "version": 1,
@@ -60,6 +63,7 @@ ADAPTER_INSTRUCTIONS = {
 }
 
 LEAD_ARTIFACT_SCHEMA_FILE = "schemas/lead-artifact.schema.json"
+SKILL_EDIT_SCHEMA_FILE = "schemas/skill-edit.schema.json"
 
 
 def _utc_now_iso() -> str:
@@ -621,6 +625,171 @@ def write_receipt(
     out_path = receipts_dir / filename
     out_path.write_text(json.dumps(receipt) + "\n", encoding="utf-8")
     return out_path, receipt
+
+
+def _schema_candidates(root: Path, schema_file: str) -> list[Path]:
+    return [
+        root / schema_file,
+        Path(__file__).resolve().parents[1] / schema_file,
+    ]
+
+
+def _load_json_schema(root: Path, schema_file: str, missing_code: str) -> dict[str, Any]:
+    schema_path: Path | None = None
+    for candidate in _schema_candidates(root, schema_file):
+        if candidate.exists() and candidate.is_file():
+            schema_path = candidate
+            break
+    if schema_path is None:
+        wanted = ", ".join(_display_path(root, p) for p in _schema_candidates(root, schema_file))
+        raise ValueError(f"{missing_code}: {wanted}")
+
+    try:
+        schema = json.loads(_load_text(schema_path))
+    except Exception as e:
+        raise ValueError(f"schema_invalid_json: {_display_path(root, schema_path)} ({e})") from e
+    if not isinstance(schema, dict):
+        raise ValueError(f"schema_invalid_shape: {_display_path(root, schema_path)}")
+    return schema
+
+
+def _require_jsonschema() -> Any:
+    try:
+        import jsonschema  # type: ignore
+    except ImportError as e:
+        raise ValueError("schema_dependency_missing: jsonschema is required; install requirements-cli.txt") from e
+    return jsonschema
+
+
+def _validate_json_payload(payload: dict[str, Any], schema: dict[str, Any], error_prefix: str) -> list[str]:
+    jsonschema = _require_jsonschema()
+    validator = jsonschema.Draft202012Validator(schema)
+    errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
+    out: list[str] = []
+    for err in errors:
+        if err.path:
+            ptr = ".".join(str(part) for part in err.path)
+        else:
+            ptr = "$"
+        out.append(f"{error_prefix} at {ptr} ({err.message})")
+    return out
+
+
+def _load_skill_edit_payload(root: Path, edit_path: Path) -> dict[str, Any]:
+    path = edit_path if edit_path.is_absolute() else (root / edit_path)
+    path = path.resolve()
+    if not path.exists() or not path.is_file():
+        raise ValueError(f"skill_edit_missing: {_display_path(root, path)}")
+    try:
+        parsed = json.loads(_load_text(path))
+    except Exception as e:
+        raise ValueError(f"skill_edit_invalid_json: {_display_path(root, path)} ({e})") from e
+    if not isinstance(parsed, dict):
+        raise ValueError(f"skill_edit_invalid_shape: {_display_path(root, path)}")
+    return parsed
+
+
+def _apply_bounded_skill_edit(text: str, edit_type: str, target: str, replacement: str) -> str:
+    occurrences = text.count(target)
+    if occurrences == 0:
+        raise ValueError("skill_edit_target_not_found")
+    if occurrences > 1:
+        raise ValueError(f"skill_edit_target_ambiguous: occurrences={occurrences}")
+
+    if edit_type == "add":
+        if not replacement:
+            raise ValueError("skill_edit_invalid_replacement: add requires non-empty replacement")
+        return text.replace(target, f"{target}{replacement}", 1)
+    if edit_type == "delete":
+        return text.replace(target, "", 1)
+    if edit_type == "replace":
+        if not replacement:
+            raise ValueError("skill_edit_invalid_replacement: replace requires non-empty replacement")
+        return text.replace(target, replacement, 1)
+    raise ValueError(f"skill_edit_invalid_type: {edit_type}")
+
+
+def _write_skill_gate_record(root: Path, relative_dir: str, record: dict[str, Any]) -> Path:
+    out_dir = root / ".sticky" / relative_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    out_path = out_dir / f"{timestamp}.jsonl"
+    out_path.write_text(json.dumps(record) + "\n", encoding="utf-8")
+    return out_path
+
+
+def apply_skill_edit(root: Path, edit_path: Path) -> tuple[str, Path, dict[str, Any]]:
+    edit_payload = _load_skill_edit_payload(root, edit_path)
+    schema = _load_json_schema(root, SKILL_EDIT_SCHEMA_FILE, "skill_edit_schema_missing")
+    schema_errors = _validate_json_payload(edit_payload, schema, "skill_edit_schema_invalid")
+    if schema_errors:
+        raise ValueError("; ".join(schema_errors))
+
+    skill_path_raw = str(edit_payload.get("skill_path") or "").strip()
+    if not skill_path_raw:
+        raise ValueError("skill_edit_invalid_skill_path")
+    skill_path = Path(skill_path_raw)
+    skill_file = skill_path if skill_path.is_absolute() else (root / skill_path)
+    skill_file = skill_file.resolve()
+    if not skill_file.exists() or not skill_file.is_file():
+        raise ValueError(f"skill_file_missing: {_display_path(root, skill_file)}")
+
+    old_text = _load_text(skill_file)
+    old_hash = _sha256_file(skill_file)
+
+    edit_type = str(edit_payload.get("edit_type") or "").strip()
+    target = str(edit_payload.get("target") or "")
+    replacement_raw = edit_payload.get("replacement")
+    replacement = "" if replacement_raw is None else str(replacement_raw)
+
+    temp_parent = root / ".tmp" / "skill-edit-temp"
+    temp_parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="agentmd-skill-edit-", dir=temp_parent) as tmp_dir:
+        tmp_path = Path(tmp_dir) / skill_file.name
+        tmp_path.write_text(old_text, encoding="utf-8")
+        new_text = _apply_bounded_skill_edit(old_text, edit_type, target, replacement)
+        tmp_path.write_text(new_text, encoding="utf-8")
+        proposed_hash = _sha256_file(tmp_path)
+
+    baseline_score = float(edit_payload.get("baseline_score"))
+    validation_score = float(edit_payload.get("validation_score"))
+    score_delta = validation_score - baseline_score
+    accepted = validation_score > baseline_score
+
+    edit_material = json.dumps(edit_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    edit_hash = hashlib.sha256(edit_material).hexdigest()
+
+    base_record = {
+        "timestamp": _utc_now_iso(),
+        "decision": "accepted" if accepted else "rejected",
+        "schema_version": str(edit_payload.get("schema_version")),
+        "skill_id": str(edit_payload.get("skill_id")),
+        "skill_path": _display_path(root, skill_file),
+        "edit_id": str(edit_payload.get("edit_id")),
+        "edit_type": edit_type,
+        "target": target,
+        "replacement": replacement,
+        "reason": str(edit_payload.get("reason") or ""),
+        "baseline_score": baseline_score,
+        "validation_score": validation_score,
+        "score_delta": score_delta,
+        "validation_task": str(edit_payload.get("validation_task") or ""),
+        "evidence": edit_payload.get("evidence"),
+        "proposed_by": str(edit_payload.get("proposed_by") or ""),
+        "old_hash": old_hash,
+        "new_hash": proposed_hash if accepted else old_hash,
+        "proposed_new_hash": proposed_hash,
+        "edit_hash": edit_hash,
+    }
+
+    if accepted:
+        skill_file.write_text(new_text, encoding="utf-8")
+        base_record["new_hash"] = _sha256_file(skill_file)
+        receipt_path = _write_skill_gate_record(root, "skill-receipts", base_record)
+        return "accepted", receipt_path, base_record
+
+    rejection_path = _write_skill_gate_record(root, "rejected-skill-edits", base_record)
+    return "rejected", rejection_path, base_record
 
 
 LEAD_VERIFIED_STATUSES = {"verified", "true", "confirmed", "pass", "passed"}
@@ -1381,6 +1550,25 @@ def lead_compile(
     typer.echo(f"deterministic_hash: {packet['deterministic_hash']}")
     typer.echo(f"receipt: {_display_path(root, receipt_path)}")
     typer.echo(f"receipt_hash: {receipt['receipt_hash']}")
+
+
+@skill_app.command("apply-edit")
+def skill_apply_edit(
+    edit: Path = typer.Option(..., "--edit", help="Path to skill edit JSON payload"),
+    root: Path = typer.Option(Path("."), "--root", help="Workspace root"),
+) -> None:
+    root = root.resolve()
+    try:
+        decision, record_path, record = apply_skill_edit(root, edit)
+    except ValueError as e:
+        typer.echo(str(e))
+        raise typer.Exit(code=1)
+
+    typer.echo(f"decision: {decision}")
+    typer.echo(f"skill_path: {record['skill_path']}")
+    typer.echo(f"record: {_display_path(root, record_path)}")
+    typer.echo(f"score_delta: {record['score_delta']}")
+    typer.echo(f"edit_hash: {record['edit_hash']}")
 
 
 @app.command()

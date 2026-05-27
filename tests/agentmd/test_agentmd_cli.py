@@ -534,3 +534,186 @@ def test_lead_compile_template_artifact_compiles(ws: Path) -> None:
     payload = json.loads((ws / ".sticky" / "current-state.json").read_text(encoding="utf-8"))
     assert payload["artifacts_ingested"] == 1
     assert payload["proof"]["run_id"] == "template-run-001"
+
+
+def test_skill_apply_edit_accepts_and_writes_receipt(ws: Path) -> None:
+    scaffold_workspace(ws)
+    edit_path = ws / "accepted-edit.json"
+    edit_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "skill-edit.v1",
+                "skill_id": "skill.s1",
+                "skill_path": "skills/s1/SKILL.md",
+                "edit_id": "edit-accept-1",
+                "edit_type": "replace",
+                "target": "Use for context drift checks.",
+                "replacement": "Use for context drift checks with validation gates.",
+                "reason": "Improve held-out validation performance.",
+                "baseline_score": 0.61,
+                "validation_score": 0.74,
+                "validation_task": "repo context drift review",
+                "evidence": ["eval:heldout-1"],
+                "proposed_by": "test-suite",
+                "timestamp": "2026-05-27T00:00:00Z",
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["skill", "apply-edit", "--root", str(ws), "--edit", str(edit_path)])
+    assert result.exit_code == 0
+    assert "decision: accepted" in result.stdout
+
+    skill_body = (ws / "skills" / "s1" / "SKILL.md").read_text(encoding="utf-8")
+    assert "validation gates." in skill_body
+
+    receipt_files = sorted((ws / ".sticky" / "skill-receipts").glob("*.jsonl"))
+    assert receipt_files
+    receipt = json.loads(receipt_files[-1].read_text(encoding="utf-8").strip())
+    assert receipt["decision"] == "accepted"
+    assert receipt["score_delta"] > 0
+    assert receipt["old_hash"] != receipt["new_hash"]
+
+
+def test_skill_apply_edit_rejects_and_writes_rejection_record(ws: Path) -> None:
+    scaffold_workspace(ws)
+    skill_path = ws / "skills" / "s1" / "SKILL.md"
+    original = skill_path.read_text(encoding="utf-8")
+
+    edit_path = ws / "rejected-edit.json"
+    edit_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "skill-edit.v1",
+                "skill_id": "skill.s1",
+                "skill_path": "skills/s1/SKILL.md",
+                "edit_id": "edit-reject-1",
+                "edit_type": "replace",
+                "target": "Use for context drift checks.",
+                "replacement": "Use for context drift checks quickly.",
+                "reason": "Try a shorter wording.",
+                "baseline_score": 0.72,
+                "validation_score": 0.58,
+                "validation_task": "repo context drift review",
+                "evidence": ["eval:heldout-1"],
+                "proposed_by": "test-suite",
+                "timestamp": "2026-05-27T00:10:00Z",
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["skill", "apply-edit", "--root", str(ws), "--edit", str(edit_path)])
+    assert result.exit_code == 0
+    assert "decision: rejected" in result.stdout
+    assert skill_path.read_text(encoding="utf-8") == original
+
+    rejection_files = sorted((ws / ".sticky" / "rejected-skill-edits").glob("*.jsonl"))
+    assert rejection_files
+    rejection = json.loads(rejection_files[-1].read_text(encoding="utf-8").strip())
+    assert rejection["decision"] == "rejected"
+    assert rejection["old_hash"] == rejection["new_hash"]
+    assert rejection["score_delta"] < 0
+
+
+def test_skill_apply_edit_fails_invalid_schema(ws: Path) -> None:
+    scaffold_workspace(ws)
+    edit_path = ws / "invalid-skill-edit.json"
+    edit_path.write_text(
+        json.dumps(
+            {
+                "skill_id": "skill.s1",
+                "skill_path": "skills/s1/SKILL.md",
+                "edit_id": "edit-invalid-1",
+                "edit_type": "replace",
+                "target": "Use for context drift checks.",
+                "replacement": "Use for context drift checks with validation gates.",
+                "reason": "Invalid payload should fail schema.",
+                "baseline_score": 0.61,
+                "validation_score": 0.74,
+                "validation_task": "repo context drift review",
+                "evidence": ["eval:heldout-1"],
+                "proposed_by": "test-suite",
+                "timestamp": "2026-05-27T00:20:00Z",
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["skill", "apply-edit", "--root", str(ws), "--edit", str(edit_path)])
+    assert result.exit_code == 1
+    assert "skill_edit_schema_invalid" in result.stdout
+
+
+def test_skill_apply_edit_fails_for_ambiguous_or_missing_target(ws: Path) -> None:
+    scaffold_workspace(ws)
+    skill_path = ws / "skills" / "s1" / "SKILL.md"
+    skill_path.write_text(
+        skill_path.read_text(encoding="utf-8") + "\nUse for context drift checks.\n",
+        encoding="utf-8",
+    )
+
+    ambiguous_edit = ws / "ambiguous-skill-edit.json"
+    ambiguous_edit.write_text(
+        json.dumps(
+            {
+                "schema_version": "skill-edit.v1",
+                "skill_id": "skill.s1",
+                "skill_path": "skills/s1/SKILL.md",
+                "edit_id": "edit-ambiguous-1",
+                "edit_type": "replace",
+                "target": "Use for context drift checks.",
+                "replacement": "Use for context drift checks with validation gates.",
+                "reason": "Ambiguous target should fail.",
+                "baseline_score": 0.61,
+                "validation_score": 0.74,
+                "validation_task": "repo context drift review",
+                "evidence": ["eval:heldout-1"],
+                "proposed_by": "test-suite",
+                "timestamp": "2026-05-27T00:30:00Z",
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    ambiguous_result = runner.invoke(app, ["skill", "apply-edit", "--root", str(ws), "--edit", str(ambiguous_edit)])
+    assert ambiguous_result.exit_code == 1
+    assert "skill_edit_target_ambiguous" in ambiguous_result.stdout
+
+    missing_edit = ws / "missing-target-skill-edit.json"
+    missing_edit.write_text(
+        json.dumps(
+            {
+                "schema_version": "skill-edit.v1",
+                "skill_id": "skill.s1",
+                "skill_path": "skills/s1/SKILL.md",
+                "edit_id": "edit-missing-1",
+                "edit_type": "replace",
+                "target": "This target does not exist.",
+                "replacement": "Replacement text.",
+                "reason": "Missing target should fail.",
+                "baseline_score": 0.61,
+                "validation_score": 0.74,
+                "validation_task": "repo context drift review",
+                "evidence": ["eval:heldout-1"],
+                "proposed_by": "test-suite",
+                "timestamp": "2026-05-27T00:31:00Z",
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    missing_result = runner.invoke(app, ["skill", "apply-edit", "--root", str(ws), "--edit", str(missing_edit)])
+    assert missing_result.exit_code == 1
+    assert "skill_edit_target_not_found" in missing_result.stdout

@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agentmd.dev/schemas/skill-edit.schema.json",
+  "title": "AgentMD Skill Edit",
+  "description": "Bounded skill edit proposal for AgentMD skill gate.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "skill_id",
+    "skill_path",
+    "edit_id",
+    "edit_type",
+    "target",
+    "replacement",
+    "reason",
+    "baseline_score",
+    "validation_score",
+    "validation_task",
+    "evidence",
+    "proposed_by",
+    "timestamp"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "skill-edit.v1"
+    },
+    "skill_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "skill_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "edit_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "edit_type": {
+      "type": "string",
+      "enum": [
+        "add",
+        "delete",
+        "replace"
+      ]
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1
+    },
+    "replacement": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseline_score": {
+      "type": "number"
+    },
+    "validation_score": {
+      "type": "number"
+    },
+    "validation_task": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "proposed_by": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timestamp": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "additionalProperties": false
+}
