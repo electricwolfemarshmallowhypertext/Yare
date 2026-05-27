@@ -9,9 +9,23 @@ The failure mode is losing the actual current state of work.
 
 AgentMD compiles scattered AI/tool run artifacts into one deterministic current-state packet.
 
-## 3. Demo input
+## 3. Proof task
 
-Lead Artifact demo inputs:
+Task:
+
+> Compile scattered Codex, Claude, and Gemini run artifacts into one verified current-state packet.
+
+Baseline:
+
+- human reads artifacts manually
+
+AgentMD path:
+
+- `agentmd lead compile` via the demo script
+
+## 4. Demo inputs and reference outputs
+
+Demo inputs:
 
 - `examples/lead-artifacts/run-codex.jsonl`
 - `examples/lead-artifacts/run-claude.json`
@@ -22,7 +36,7 @@ Reference outputs:
 - `examples/lead-output/current-state.example.md`
 - `examples/lead-output/current-state.example.json`
 
-## 4. Before -> After
+## 5. Before → After
 
 Before:
 
@@ -33,13 +47,13 @@ After:
 - one compiled current-state packet
 - one receipt trail
 
-## 5. Command
+## 6. Exact demo command
 
 ```powershell
 .\scripts\demo-lead-compile.ps1
 ```
 
-## 6. Output
+## 7. Generated runtime outputs
 
 The compile writes:
 
@@ -47,21 +61,43 @@ The compile writes:
 - `.sticky/current-state.md`
 - `.sticky/receipts/*.jsonl`
 
-## 7. Packet excerpt (from example output)
+## 8. Packet excerpt (from example output)
 
 Excerpt source: `examples/lead-output/current-state.example.md`
 
 ```text
+Task: compile ai work lead state
+Deterministic Hash: a9ccb7bd56bcf357aaf852683387eb72bc8b7f2f78b374ac55ad8680114282c4
+Artifacts Ingested: 3
+
 ## What Changed
+- README.md
+- apps/api/src/memory/server.py
+- cli/agentmd.py
+
 ## What Is True
+- Endpoint returns latest receipt
+- README includes AI Work Lead section
+
 ## What Is Unverified
+- All receipt tests passed in CI
+
 ## What Contradicts Prior State
+- Receipt includes git dirty status
+
 ## What Needs Human Approval
+- Approve endpoint release gate exception
+- Hold release until endpoint smoke test exists
+
 ## Open Loops
+- Add integration coverage for lead compile (open)
+- Confirm rollback procedure with ops (open)
+
 ## Next Clean Action
+- Resolve human-approval items before the next run.
 ```
 
-## 8. What the packet contains
+## 9. What the packet contains
 
 - what changed
 - what is true
@@ -71,7 +107,22 @@ Excerpt source: `examples/lead-output/current-state.example.md`
 - open loops
 - next clean action
 
-## 9. Schema proof
+## 10. Minimum benchmark (single reproducible proof)
+
+| Metric | Result |
+|---|---|
+| Lead artifacts processed | 3 |
+| Schema validation | PASS |
+| Current-state packet generated | PASS |
+| Deterministic hash repeat match | PASS |
+| Receipts written | PASS |
+| Contradictions preserved | PASS |
+| Open loops preserved | PASS |
+| Time to compile | measured locally; not benchmarked |
+| Tests | 20 passed |
+| CI | green |
+
+## 11. Schema proof
 
 Lead Artifact v1 validates input artifacts.  
 Invalid artifacts fail clearly.
@@ -80,7 +131,7 @@ Schema:
 
 - `schemas/lead-artifact.schema.json`
 
-## 10. CI and release proof
+## 12. CI and release proof
 
 - CI: green
 - AgentMD Lead Demo: green
@@ -95,7 +146,7 @@ Current verified facts:
 - latest release: `v0.3.0-alpha.2`
 - latest release commit: `6efc66d`
 
-## 11. Skill gate proof
+## 13. Skill gate proof
 
 Accepted skill edit writes:
 
@@ -109,7 +160,7 @@ Schema:
 
 - `schemas/skill-edit.schema.json`
 
-## 12. What this proves
+## 14. What this proves
 
 - artifacts can be normalized
 - schema validation works
@@ -117,7 +168,7 @@ Schema:
 - proof receipts are written
 - skill edits are gated by validation score
 
-## 13. What this does not prove yet
+## 15. What this does not prove yet
 
 - production SaaS readiness
 - full adapter automation
@@ -125,7 +176,7 @@ Schema:
 - autonomous optimizer loop
 - security hardening for hostile inputs
 
-## 14. Boundaries
+## 16. Boundaries
 
 - Alpha release.
 - Evaluation/research/internal testing use.
