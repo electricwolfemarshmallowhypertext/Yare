@@ -6,6 +6,8 @@
 
 **AgentMD compiles scattered AI/tool runs into one verified current-state packet.**
 
+It compiles scattered AI/tool runs into one verified current-state packet, with schema validation, deterministic hashes, and proof receipts.
+
 ![AgentMD Flow](docs/assets/agentmd-flow.png)
 
 ## Proof
