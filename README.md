@@ -4,7 +4,7 @@
 
 It makes `AGENTS.md`, skills, memory, policies, evals, and execution receipts executable, versioned, and auditable.
 
-AgentMD is not a notes app, persona marketplace, or prompt-pack wrapper. It is a local-first runtime for governing the context agents use before, during, and after execution.
+AgentMD is not a notes app, persona marketplace, or prompt-pack wrapper. It is a deployment-agnostic runtime for governing the context agents use before, during, and after execution across local, repo, CI, cloud, and enterprise environments.
 
 ## Problem
 
@@ -148,6 +148,62 @@ Prepares an adapter run for supported agent CLIs.
 
 v0.1 does not deeply integrate with each external agent runtime yet. It resolves context and records receipts around the intended execution path.
 
+
+
+## AI Work Lead
+
+AI-assisted delivery creates scattered run artifacts across tools, chats, and agents. `agentmd lead compile` turns those fragments into one verified current-state packet.
+
+`Lead Artifact v1` is the portable input format for AI/tool run outputs. Any agent or tool can emit this schema, and AgentMD compiles those artifacts into a verified current-state packet.
+
+Lead Artifact v1 contract details:
+
+- Schema file: `schemas/lead-artifact.schema.json`
+- Required version field: `schema_version: "lead-artifact.v1"`
+- Schema validation dependency: `jsonschema` (required in `requirements-cli.txt`)
+- Invalid artifacts fail `agentmd lead compile` with explicit schema errors.
+
+### Emit a Lead Artifact from any AI tool
+
+AgentMD does not require custom adapters first. Any AI tool can emit the `Lead Artifact` schema, then AgentMD compiles it with `--artifact`.
+
+- Prompt: `prompts/emit-lead-artifact.md`
+- Template: `examples/lead-artifacts/template.lead-artifact.json`
+
+```powershell
+.\agentmd.cmd lead compile --task "compile ai work lead state" `
+  --artifact examples/lead-artifacts/template.lead-artifact.json
+```
+
+Compiled outputs:
+
+- `.sticky/current-state.json`
+- `.sticky/current-state.md`
+- `.sticky/receipts/*.jsonl`
+
+Demo command (using current supported flags):
+
+```powershell
+.\agentmd.cmd lead compile --task "compile ai work lead state" `
+  --artifact examples/lead-artifacts/run-codex.jsonl `
+  --artifact examples/lead-artifacts/run-claude.json `
+  --artifact examples/lead-artifacts/run-gemini.jsonl
+```
+
+This compiles one operating picture covering what changed, what is true, what is unverified, contradictions, human approval items, open loops, and the next clean action.
+
+The demo can also run in GitHub Actions via the `AgentMD Lead Demo` workflow (`.github/workflows/agentmd-lead-demo.yml`) to prove the current-state packet is reproducible outside a local session.
+
+Run the demo:
+
+```powershell
+.\scripts\demo-lead-compile.ps1
+```
+
+### Future: controlled skill optimization
+
+NOT IMPLEMENTED: v0.3 direction is a controlled Skill Optimization loop for `skills/*/SKILL.md` using bounded text edits (add/delete/replace), held-out validation gates, accept-only-if-improved policy, and skill receipts. See `docs/skill_optimization.md`.
+
 ## Explainable Results UI
 
 AgentMD includes a minimal explainable results dashboard.
@@ -216,7 +272,7 @@ python -m pytest -q tests/agentmd/test_agentmd_cli.py
 Expected current result:
 
 ```text
-8 passed
+16 passed
 ```
 
 ## Server verification
@@ -279,6 +335,14 @@ Those are later layers. v0.1 proves the core runtime:
 validate â†’ resolve â†’ hash â†’ receipt â†’ explain
 ```
 
+## v0.2.0 Release Candidate
+
+- Release line: AI Work Lead with Lead Artifact v1 input contract.
+- Framing: deployment-agnostic runtime (local, repo, CI, cloud, enterprise).
+- Validation: required `jsonschema` dependency for strict schema enforcement.
+- Proof loop: deterministic current-state packet + receipt artifacts.
+- CI proof workflow: `AgentMD Lead Demo` (`.github/workflows/agentmd-lead-demo.yml`).
+
 ## License
 
 AgentMD Runtime is source-available under **Business Source License 1.1 (BUSL-1.1)**.
@@ -293,7 +357,7 @@ Current verified state:
 
 ```text
 doctor: PASS
-AgentMD tests: 8 passed
+AgentMD tests: 16 passed
 remote: electricwolfemarshmallowhypertext/agentmd-runtime
 branch: main
 ```
@@ -311,7 +375,7 @@ c4d3aa4 harden AgentMD context governance CLI
 
 **AgentMD makes agent context executable.**
 
-It gives AI teams a local-first way to validate, resolve, version, hash, and audit the context their agents depend on.
+It gives AI teams a deployment-agnostic way to validate, resolve, version, hash, and audit the context their agents depend on.
 
 The result is a reproducible context trace:
 
@@ -322,4 +386,3 @@ What policy applied?
 What changed?
 What receipt proves it?
 ```
-

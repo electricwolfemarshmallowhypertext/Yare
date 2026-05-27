@@ -1,0 +1,14 @@
+{
+  "run_id": "template-run-001",
+  "tool": "replace-with-tool-name",
+  "task": "replace-with-task",
+  "timestamp": "2026-05-27T00:00:00Z",
+  "claims": [],
+  "decisions": [],
+  "files_touched": [],
+  "open_loops": [],
+  "contradictions": [],
+  "human_approval_items": [],
+  "verification_status": "unverified",
+  "schema_version": "lead-artifact.v1"
+}

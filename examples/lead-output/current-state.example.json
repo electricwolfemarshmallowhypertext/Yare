@@ -1,0 +1,231 @@
+{
+  "version": "0.2",
+  "primitive": "ai_work_lead",
+  "task": "compile ai work lead state",
+  "artifacts_ingested": 3,
+  "artifact_sources": [
+    "examples/lead-artifacts/run-claude.json",
+    "examples/lead-artifacts/run-codex.jsonl:1",
+    "examples/lead-artifacts/run-gemini.jsonl:1"
+  ],
+  "artifacts": [
+    {
+      "run_id": "demo-run-001",
+      "timestamp": "2026-05-26T10:00:00Z",
+      "source_artifact": "examples/lead-artifacts/run-codex.jsonl:1",
+      "task": "stabilize receipt output",
+      "adapter": "codex",
+      "files_touched": [
+        "cli/agentmd.py"
+      ],
+      "claims_made": [
+        {
+          "text": "All receipt tests passed in CI",
+          "verification_status": "unverified"
+        },
+        {
+          "text": "Receipt includes git dirty status",
+          "verification_status": "verified"
+        }
+      ],
+      "decisions_made": [
+        {
+          "text": "Keep receipt schema backward compatible",
+          "status": "verified",
+          "requires_human_approval": false
+        }
+      ],
+      "open_loops": [
+        {
+          "text": "Add integration coverage for lead compile",
+          "status": "open"
+        }
+      ],
+      "contradictions": [],
+      "needs_human_approval": [],
+      "verification_status": "unverified",
+      "context_bundle_hash": "demo-bundle-001",
+      "receipt_hash": "demo-receipt-001",
+      "git_state": {
+        "available": false,
+        "commit": null,
+        "dirty": null,
+        "changed_files": [],
+        "untracked_files": [],
+        "reason": "captured_from_external_tool"
+      }
+    },
+    {
+      "run_id": "demo-run-002",
+      "timestamp": "2026-05-26T10:15:00Z",
+      "source_artifact": "examples/lead-artifacts/run-claude.json",
+      "task": "verify agentmd results endpoint",
+      "adapter": "claude",
+      "files_touched": [
+        "apps/api/src/memory/server.py"
+      ],
+      "claims_made": [
+        {
+          "text": "Endpoint returns latest receipt",
+          "verification_status": "verified"
+        },
+        {
+          "text": "Receipt includes git dirty status",
+          "verification_status": "contradicted"
+        }
+      ],
+      "decisions_made": [
+        {
+          "text": "Hold release until endpoint smoke test exists",
+          "status": "unknown",
+          "requires_human_approval": true
+        }
+      ],
+      "open_loops": [
+        {
+          "text": "Confirm rollback procedure with ops",
+          "status": "open"
+        }
+      ],
+      "contradictions": [
+        "Receipt includes git dirty status"
+      ],
+      "needs_human_approval": [
+        "Approve endpoint release gate exception",
+        "Hold release until endpoint smoke test exists"
+      ],
+      "verification_status": "needs_human_approval",
+      "context_bundle_hash": "demo-bundle-002",
+      "receipt_hash": "demo-receipt-002",
+      "git_state": {
+        "available": false,
+        "commit": null,
+        "dirty": null,
+        "changed_files": [
+          "apps/api/src/memory/server.py"
+        ],
+        "untracked_files": [],
+        "reason": "captured_from_external_tool"
+      }
+    },
+    {
+      "run_id": "demo-run-003",
+      "timestamp": "2026-05-26T10:30:00Z",
+      "source_artifact": "examples/lead-artifacts/run-gemini.jsonl:1",
+      "task": "document lead compile usage",
+      "adapter": "gemini",
+      "files_touched": [
+        "README.md",
+        "examples/lead-artifacts/run-gemini.jsonl"
+      ],
+      "claims_made": [
+        {
+          "text": "README includes AI Work Lead section",
+          "verification_status": "verified"
+        }
+      ],
+      "decisions_made": [
+        {
+          "text": "Publish demo pack with explicit artifact inputs",
+          "status": "verified",
+          "requires_human_approval": false
+        }
+      ],
+      "open_loops": [
+        {
+          "text": "Validate demo command on fresh clone",
+          "status": "open"
+        }
+      ],
+      "contradictions": [],
+      "needs_human_approval": [],
+      "verification_status": "verified",
+      "context_bundle_hash": "demo-bundle-003",
+      "receipt_hash": "demo-receipt-003",
+      "git_state": {
+        "available": false,
+        "commit": null,
+        "dirty": null,
+        "changed_files": [
+          "README.md"
+        ],
+        "untracked_files": [
+          "examples/lead-output/current-state.example.json"
+        ],
+        "reason": "captured_from_external_tool"
+      }
+    }
+  ],
+  "current_state": {
+    "what_changed": [
+      "README.md",
+      "apps/api/src/memory/server.py",
+      "cli/agentmd.py",
+      "examples/lead-artifacts/run-gemini.jsonl"
+    ],
+    "what_is_true": [
+      "Endpoint returns latest receipt",
+      "README includes AI Work Lead section",
+      "Receipt includes git dirty status"
+    ],
+    "what_is_unverified": [
+      "All receipt tests passed in CI"
+    ],
+    "what_contradicts_prior_state": [
+      "Receipt includes git dirty status"
+    ],
+    "what_needs_human_approval": [
+      "Approve endpoint release gate exception",
+      "Hold release until endpoint smoke test exists",
+      "Resolve contradiction: Receipt includes git dirty status"
+    ],
+    "open_loops": [
+      {
+        "text": "Add integration coverage for lead compile",
+        "status": "open"
+      },
+      {
+        "text": "Confirm rollback procedure with ops",
+        "status": "open"
+      },
+      {
+        "text": "Validate demo command on fresh clone",
+        "status": "open"
+      }
+    ],
+    "next_clean_action": "Resolve human-approval items before the next run."
+  },
+  "proof": {
+    "run_id": "demo-run-003",
+    "timestamp": "2026-05-26T10:30:00Z",
+    "context_bundle_hash": "demo-bundle-003",
+    "receipt_hash": "demo-receipt-003",
+    "source_artifacts": [
+      "examples/lead-artifacts/run-claude.json",
+      "examples/lead-artifacts/run-codex.jsonl:1",
+      "examples/lead-artifacts/run-gemini.jsonl:1"
+    ],
+    "git_state": {
+      "available": true,
+      "commit": "d505804f8c9a446a6f06adcaddd87b7327113d12",
+      "dirty": true,
+      "changed_files": [
+        "README.md",
+        "cli/agentmd.py",
+        "tests/agentmd/test_agentmd_cli.py"
+      ],
+      "untracked_files": [
+        ".sticky/",
+        "examples/lead-artifacts/",
+        "examples/lead-output/"
+      ],
+      "reason": null
+    }
+  },
+  "validation": {
+    "ok": true,
+    "errors": [],
+    "warnings": []
+  },
+  "deterministic_hash": "a9ccb7bd56bcf357aaf852683387eb72bc8b7f2f78b374ac55ad8680114282c4"
+}

@@ -1,0 +1,48 @@
+name: AgentMD Lead Demo
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  lead-demo:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-cli.txt
+          python -m pip install pytest pyyaml
+
+      - name: Validate CLI syntax
+        shell: pwsh
+        run: python -m py_compile cli/agentmd.py
+
+      - name: Run AgentMD CLI tests
+        shell: pwsh
+        run: python -m pytest -q tests/agentmd/test_agentmd_cli.py
+
+      - name: Run AI Work Lead demo
+        shell: pwsh
+        run: .\scripts\demo-lead-compile.ps1
+
+      - name: Upload AI Work Lead proof artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentmd-lead-proof
+          if-no-files-found: error
+          path: |
+            .sticky/current-state.json
+            .sticky/current-state.md
+            .sticky/receipts/*.jsonl

@@ -1,0 +1,51 @@
+{
+  "run_id": "demo-run-002",
+  "tool": "claude",
+  "task": "verify agentmd results endpoint",
+  "timestamp": "2026-05-26T10:15:00Z",
+  "claims": [
+    {
+      "claim": "Endpoint returns latest receipt",
+      "verification_status": "verified"
+    },
+    {
+      "claim": "Receipt includes git dirty status",
+      "verification_status": "contradicted"
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Hold release until endpoint smoke test exists",
+      "requires_human_approval": true
+    }
+  ],
+  "files_touched": [
+    "apps/api/src/memory/server.py"
+  ],
+  "open_loops": [
+    "Confirm rollback procedure with ops"
+  ],
+  "contradictions": [
+    "Receipt includes git dirty status"
+  ],
+  "human_approval_items": [
+    "Approve endpoint release gate exception"
+  ],
+  "verification_status": "needs_human_approval",
+  "context_bundle_hash": "demo-bundle-002",
+  "receipt_hash": "demo-receipt-002",
+  "source_artifacts": [
+    "runs/claude/002"
+  ],
+  "git_state": {
+    "available": false,
+    "commit": null,
+    "dirty": null,
+    "changed_files": [
+      "apps/api/src/memory/server.py"
+    ],
+    "untracked_files": [],
+    "reason": "captured_from_external_tool"
+  },
+  "schema_version": "lead-artifact.v1"
+}

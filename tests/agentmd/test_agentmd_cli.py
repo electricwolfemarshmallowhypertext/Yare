@@ -260,3 +260,277 @@ def test_receipt_uses_last_custom_resolved_output(ws: Path) -> None:
     assert payload["resolved_context_file"] == "custom/resolved.json"
     assert payload["selected_context_files"], "receipt should include selected context from last custom resolved output"
     assert payload["context_bundle_hash"]
+
+
+
+def test_lead_compile_ingests_artifact_and_writes_outputs(ws: Path) -> None:
+    scaffold_workspace(ws)
+    artifact_path = ws / "artifacts.jsonl"
+    artifact_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "lead-artifact.v1",
+                "run_id": "run-1",
+                "timestamp": "2026-05-20T00:00:00Z",
+                "agent": "codex",
+                "task": "compile current state",
+                "files_touched": ["memory/state.md"],
+                "claims_made": [{"claim": "AGENTS.md exists", "verification_status": "verified"}],
+                "decisions_made": [{"decision": "Defer deployment", "requires_human_approval": True}],
+                "open_loops": ["Confirm policy owner"],
+                "verification_status": "partial",
+                "context_bundle_hash": "bundle-abc",
+                "receipt_hash": "receipt-abc",
+                "changed_files": ["AGENTS.md"],
+                "untracked_files": ["notes/tmp.md"],
+                "git_available": False,
+                "git_reason": "not_a_git_repository",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        ["lead", "compile", "--root", str(ws), "--artifact", str(artifact_path)],
+    )
+    assert result.exit_code == 0
+
+    state_json = ws / ".sticky" / "current-state.json"
+    state_md = ws / ".sticky" / "current-state.md"
+    assert state_json.exists()
+    assert state_md.exists()
+
+    payload = json.loads(state_json.read_text(encoding="utf-8"))
+    assert payload["artifacts_ingested"] == 1
+    assert payload["task"] == "compile current state"
+    assert payload["proof"]["run_id"] == "run-1"
+    assert payload["proof"]["context_bundle_hash"] == "bundle-abc"
+    assert "AGENTS.md" in payload["current_state"]["what_changed"]
+    loop_texts = {loop["text"] for loop in payload["current_state"]["open_loops"]}
+    assert "Confirm policy owner" in loop_texts
+
+    receipt_files = sorted((ws / ".sticky" / "receipts").glob("*.jsonl"))
+    assert receipt_files
+
+
+def test_lead_compile_is_deterministic_for_same_artifact_input(ws: Path) -> None:
+    scaffold_workspace(ws)
+    artifact_path = ws / "lead-input.jsonl"
+    artifact = {
+        "schema_version": "lead-artifact.v1",
+        "run_id": "stable-run",
+        "tool": "codex",
+        "timestamp": "2026-05-20T01:02:03Z",
+        "task": "deterministic packet",
+        "files_touched": ["memory/state.md", "policies/p1.yaml"],
+        "claims_made": [{"claim": "policy loaded", "verification_status": "verified"}],
+        "open_loops": ["confirm reviewer"],
+        "context_bundle_hash": "bundle-stable",
+        "receipt_hash": "receipt-stable",
+        "git_available": False,
+        "git_reason": "not_a_git_repository",
+    }
+    artifact_path.write_text(json.dumps(artifact) + "\n", encoding="utf-8")
+
+    first = runner.invoke(app, ["lead", "compile", "--root", str(ws), "--artifact", str(artifact_path)])
+    assert first.exit_code == 0
+    first_payload = json.loads((ws / ".sticky" / "current-state.json").read_text(encoding="utf-8"))
+
+    second = runner.invoke(app, ["lead", "compile", "--root", str(ws), "--artifact", str(artifact_path)])
+    assert second.exit_code == 0
+    second_payload = json.loads((ws / ".sticky" / "current-state.json").read_text(encoding="utf-8"))
+
+    assert first_payload == second_payload
+    assert first_payload["deterministic_hash"] == second_payload["deterministic_hash"]
+
+
+def test_lead_compile_preserves_contradictions_and_open_loops(ws: Path) -> None:
+    scaffold_workspace(ws)
+    artifact_path = ws / "contradictions.jsonl"
+    artifact_path.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "schema_version": "lead-artifact.v1",
+                        "run_id": "r1",
+                        "tool": "codex",
+                        "timestamp": "2026-05-20T00:00:00Z",
+                        "task": "check contradiction handling",
+                        "claims_made": [{"claim": "service door was sealed", "verification_status": "verified"}],
+                        "open_loops": ["Find Mara"],
+                    }
+                ),
+                json.dumps(
+                    {
+                        "schema_version": "lead-artifact.v1",
+                        "run_id": "r2",
+                        "tool": "claude",
+                        "timestamp": "2026-05-20T00:01:00Z",
+                        "task": "check contradiction handling",
+                        "claims_made": [{"claim": "service door was sealed", "verification_status": "contradicted"}],
+                        "open_loops": ["Inspect pantry"],
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["lead", "compile", "--root", str(ws), "--artifact", str(artifact_path)])
+    assert result.exit_code == 0
+
+    payload = json.loads((ws / ".sticky" / "current-state.json").read_text(encoding="utf-8"))
+    contradictions = payload["current_state"]["what_contradicts_prior_state"]
+    assert any("service door was sealed" in item for item in contradictions)
+
+    open_loop_texts = {loop["text"] for loop in payload["current_state"]["open_loops"]}
+    assert open_loop_texts == {"Find Mara", "Inspect pantry"}
+    approvals = payload["current_state"]["what_needs_human_approval"]
+    assert any(item.startswith("Resolve contradiction: service door was sealed") for item in approvals)
+
+
+
+def test_lead_compile_rejects_invalid_artifact_schema(ws: Path) -> None:
+    scaffold_workspace(ws)
+    artifact_path = ws / "invalid-artifact.jsonl"
+    artifact_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "lead-artifact.v1",
+                "run_id": "bad-run",
+                "task": "missing required schema fields",
+                "timestamp": "2026-05-20T11:00:00Z",
+                "claims": "should-be-array",
+                "decisions": [],
+                "files_touched": [],
+                "open_loops": [],
+                "contradictions": [],
+                "human_approval_items": [],
+                "verification_status": "verified",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["lead", "compile", "--root", str(ws), "--artifact", str(artifact_path)])
+    assert result.exit_code == 1
+    assert "lead_artifact_schema_invalid" in result.stdout
+
+
+def test_lead_compile_rejects_missing_schema_version(ws: Path) -> None:
+    scaffold_workspace(ws)
+    artifact_path = ws / "missing-schema-version.json"
+    artifact_path.write_text(
+        json.dumps(
+            {
+                "run_id": "missing-version",
+                "tool": "codex",
+                "task": "missing schema version",
+                "timestamp": "2026-05-20T11:30:00Z",
+                "claims": [],
+                "decisions": [],
+                "files_touched": [],
+                "open_loops": [],
+                "contradictions": [],
+                "human_approval_items": [],
+                "verification_status": "unverified",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["lead", "compile", "--root", str(ws), "--artifact", str(artifact_path)])
+    assert result.exit_code == 1
+    assert "schema_version" in result.stdout
+
+
+def test_lead_compile_accepts_valid_artifact_schema(ws: Path) -> None:
+    scaffold_workspace(ws)
+    artifact_path = ws / "valid-artifact.json"
+    artifact_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "lead-artifact.v1",
+                "run_id": "valid-run",
+                "tool": "codex",
+                "task": "validate schema",
+                "timestamp": "2026-05-20T12:00:00Z",
+                "claims": [{"claim": "schema exists", "verification_status": "verified"}],
+                "decisions": [{"decision": "accept artifact", "status": "verified"}],
+                "files_touched": ["README.md"],
+                "open_loops": ["confirm rollout"],
+                "contradictions": [],
+                "human_approval_items": [],
+                "verification_status": "verified",
+                "context_bundle_hash": "bundle-valid",
+                "receipt_hash": "receipt-valid",
+                "source_artifacts": ["tool-output/123"],
+                "git_state": {
+                    "available": False,
+                    "commit": None,
+                    "dirty": None,
+                    "changed_files": [],
+                    "untracked_files": [],
+                    "reason": "external",
+                },
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["lead", "compile", "--root", str(ws), "--artifact", str(artifact_path)])
+    assert result.exit_code == 0
+    payload = json.loads((ws / ".sticky" / "current-state.json").read_text(encoding="utf-8"))
+    assert payload["artifacts_ingested"] == 1
+
+
+def test_lead_compile_demo_artifacts_still_compile(ws: Path) -> None:
+    scaffold_workspace(ws)
+    demo_dir = REPO_ROOT / "examples" / "lead-artifacts"
+    result = runner.invoke(
+        app,
+        [
+            "lead",
+            "compile",
+            "--root",
+            str(ws),
+            "--artifact",
+            str(demo_dir / "run-codex.jsonl"),
+            "--artifact",
+            str(demo_dir / "run-claude.json"),
+            "--artifact",
+            str(demo_dir / "run-gemini.jsonl"),
+        ],
+    )
+    assert result.exit_code == 0
+    payload = json.loads((ws / ".sticky" / "current-state.json").read_text(encoding="utf-8"))
+    assert payload["artifacts_ingested"] == 3
+    assert payload["proof"]["run_id"] == "demo-run-003"
+
+
+def test_lead_compile_template_artifact_compiles(ws: Path) -> None:
+    scaffold_workspace(ws)
+    template_path = REPO_ROOT / "examples" / "lead-artifacts" / "template.lead-artifact.json"
+    result = runner.invoke(
+        app,
+        [
+            "lead",
+            "compile",
+            "--root",
+            str(ws),
+            "--artifact",
+            str(template_path),
+        ],
+    )
+    assert result.exit_code == 0
+    payload = json.loads((ws / ".sticky" / "current-state.json").read_text(encoding="utf-8"))
+    assert payload["artifacts_ingested"] == 1
+    assert payload["proof"]["run_id"] == "template-run-001"

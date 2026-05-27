@@ -16,3 +16,8 @@ build/
 data/
 
 .agentmd/last-resolved-path.txt
+.sticky/
+!examples/lead-artifacts/
+!examples/lead-artifacts/**
+!examples/lead-output/
+!examples/lead-output/**

@@ -13,6 +13,8 @@ import typer
 import yaml
 
 app = typer.Typer(add_completion=False, help="AgentMD context governance runtime CLI")
+lead_app = typer.Typer(add_completion=False, help="AI Work Lead primitives")
+app.add_typer(lead_app, name="lead")
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "version": 1,
@@ -56,6 +58,8 @@ ADAPTER_INSTRUCTIONS = {
     "claude": "claude code --prompt \"{task}\" --context-file \"{context_file}\"",
     "gemini": "gemini --prompt \"{task}\" --context-file \"{context_file}\"",
 }
+
+LEAD_ARTIFACT_SCHEMA_FILE = "schemas/lead-artifact.schema.json"
 
 
 def _utc_now_iso() -> str:
@@ -617,6 +621,766 @@ def write_receipt(
     out_path = receipts_dir / filename
     out_path.write_text(json.dumps(receipt) + "\n", encoding="utf-8")
     return out_path, receipt
+
+
+LEAD_VERIFIED_STATUSES = {"verified", "true", "confirmed", "pass", "passed"}
+LEAD_UNVERIFIED_STATUSES = {"unverified", "unknown", "pending", "needs_verification", "partial"}
+LEAD_CONTRADICTORY_STATUSES = {"contradicted", "false", "failed", "fail", "rejected"}
+LEAD_HUMAN_APPROVAL_STATUSES = {"needs_human_approval", "approval_required", "blocked"}
+
+
+def _lead_status(value: Any) -> str:
+    if isinstance(value, bool):
+        return "verified" if value else "unverified"
+    status = str(value or "").strip().lower().replace(" ", "_")
+    if status in LEAD_VERIFIED_STATUSES:
+        return "verified"
+    if status in LEAD_CONTRADICTORY_STATUSES:
+        return "contradicted"
+    if status in LEAD_HUMAN_APPROVAL_STATUSES:
+        return "needs_human_approval"
+    if status in LEAD_UNVERIFIED_STATUSES:
+        return "unverified"
+    return "unknown"
+
+
+def _lead_to_str_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        v = value.strip()
+        return [v] if v else []
+    if isinstance(value, list):
+        out: list[str] = []
+        for item in value:
+            if isinstance(item, dict):
+                text = str(item.get("text") or item.get("value") or "").strip()
+            else:
+                text = str(item).strip()
+            if text:
+                out.append(text)
+        return out
+    return []
+
+
+def _lead_norm_path(path_value: str) -> str:
+    return path_value.replace("\\", "/").strip()
+
+
+def _lead_dedupe_sorted(items: list[str]) -> list[str]:
+    return sorted({item for item in items if item})
+
+
+def _lead_load_artifacts_from_file(root: Path, path: Path) -> tuple[list[tuple[dict[str, Any], str]], list[str]]:
+    records: list[tuple[dict[str, Any], str]] = []
+    warnings: list[str] = []
+    source = _display_path(root, path)
+    if not path.exists() or not path.is_file():
+        warnings.append(f"artifact_missing: {source}")
+        return records, warnings
+
+    try:
+        text = _load_text(path)
+    except Exception as e:
+        warnings.append(f"artifact_read_error: {source} ({e})")
+        return records, warnings
+
+    suffix = path.suffix.lower()
+    if suffix == ".jsonl":
+        for idx, line in enumerate(text.splitlines(), start=1):
+            if not line.strip():
+                continue
+            try:
+                data = json.loads(line)
+            except Exception as e:
+                warnings.append(f"artifact_jsonl_invalid: {source}:{idx} ({e})")
+                continue
+            if not isinstance(data, dict):
+                warnings.append(f"artifact_record_not_object: {source}:{idx}")
+                continue
+            records.append((data, f"{source}:{idx}"))
+        return records, warnings
+
+    if suffix == ".json":
+        try:
+            parsed = json.loads(text)
+        except Exception as e:
+            warnings.append(f"artifact_json_invalid: {source} ({e})")
+            return records, warnings
+        if isinstance(parsed, dict):
+            records.append((parsed, source))
+        elif isinstance(parsed, list):
+            for idx, item in enumerate(parsed, start=1):
+                if isinstance(item, dict):
+                    records.append((item, f"{source}:{idx}"))
+                else:
+                    warnings.append(f"artifact_record_not_object: {source}:{idx}")
+        else:
+            warnings.append(f"artifact_json_unsupported: {source}")
+        return records, warnings
+
+    warnings.append(f"artifact_extension_unsupported: {source}")
+    return records, warnings
+
+
+def _lead_schema_candidates(root: Path) -> list[Path]:
+    # Prefer workspace-local schema, then fall back to the packaged repo schema.
+    return [
+        root / LEAD_ARTIFACT_SCHEMA_FILE,
+        Path(__file__).resolve().parents[1] / LEAD_ARTIFACT_SCHEMA_FILE,
+    ]
+
+
+def _lead_load_schema(root: Path) -> dict[str, Any]:
+    schema_path: Path | None = None
+    for candidate in _lead_schema_candidates(root):
+        if candidate.exists() and candidate.is_file():
+            schema_path = candidate
+            break
+    if schema_path is None:
+        wanted = ", ".join(_display_path(root, p) for p in _lead_schema_candidates(root))
+        raise ValueError(f"lead_artifact_schema_missing: {wanted}")
+    try:
+        schema = json.loads(_load_text(schema_path))
+    except Exception as e:
+        raise ValueError(f"lead_artifact_schema_invalid_json: {_display_path(root, schema_path)} ({e})") from e
+    if not isinstance(schema, dict):
+        raise ValueError(f"lead_artifact_schema_invalid_shape: {_display_path(root, schema_path)}")
+    return schema
+
+
+def _lead_contract_payload(raw: dict[str, Any]) -> dict[str, Any]:
+    claims = raw.get("claims")
+    if claims is None:
+        claims = raw.get("claims_made")
+    if claims is None:
+        claims = []
+
+    decisions = raw.get("decisions")
+    if decisions is None:
+        decisions = raw.get("decisions_made")
+    if decisions is None:
+        decisions = []
+
+    open_loops = raw.get("open_loops")
+    if open_loops is None:
+        open_loops = []
+
+    contradictions = raw.get("contradictions")
+    if contradictions is None:
+        contradictions = []
+
+    human_approval = raw.get("human_approval_items")
+    if human_approval is None:
+        human_approval = raw.get("needs_human_approval")
+    if human_approval is None:
+        human_approval = []
+
+    git_state = raw.get("git_state")
+    if not isinstance(git_state, dict):
+        has_git_fields = any(
+            raw.get(key) is not None
+            for key in ("git_available", "git_commit", "git_dirty", "changed_files", "untracked_files", "git_reason")
+        )
+        if has_git_fields:
+            available_value = raw.get("git_available")
+            git_state = {
+                "available": bool(available_value) if available_value is not None else False,
+                "commit": raw.get("git_commit"),
+                "dirty": raw.get("git_dirty"),
+                "changed_files": _lead_to_str_list(raw.get("changed_files")),
+                "untracked_files": _lead_to_str_list(raw.get("untracked_files")),
+                "reason": raw.get("git_reason"),
+            }
+        else:
+            git_state = None
+
+    payload: dict[str, Any] = {
+        "schema_version": str(raw.get("schema_version") or "").strip(),
+        "run_id": str(raw.get("run_id") or raw.get("receipt_hash") or "").strip(),
+        "tool": str(raw.get("tool") or raw.get("adapter") or raw.get("agent") or raw.get("chat") or "").strip(),
+        "task": str(raw.get("task") or "").strip(),
+        "timestamp": str(raw.get("timestamp") or raw.get("generated_at") or "").strip(),
+        "claims": claims,
+        "decisions": decisions,
+        "files_touched": raw.get("files_touched") if raw.get("files_touched") is not None else [],
+        "open_loops": open_loops,
+        "contradictions": contradictions,
+        "human_approval_items": human_approval,
+        "verification_status": str(raw.get("verification_status") or "unknown"),
+    }
+
+    optional_map = {
+        "context_bundle_hash": raw.get("context_bundle_hash"),
+        "receipt_hash": raw.get("receipt_hash"),
+        "source_artifacts": raw.get("source_artifacts"),
+        "git_state": git_state,
+    }
+    for key, value in optional_map.items():
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        payload[key] = value
+    return payload
+
+
+def _lead_validate_artifact_schema(root: Path, raw: dict[str, Any], source_ref: str) -> list[str]:
+    schema = _lead_load_schema(root)
+    payload = _lead_contract_payload(raw)
+
+    try:
+        import jsonschema  # type: ignore
+    except ImportError as e:
+        raise ValueError(
+            "lead_artifact_schema_dependency_missing: jsonschema is required; install requirements-cli.txt"
+        ) from e
+
+    validator = jsonschema.Draft202012Validator(schema)
+    errors = sorted(validator.iter_errors(payload), key=lambda e: list(e.path))
+    out: list[str] = []
+    for err in errors:
+        if err.path:
+            ptr = ".".join(str(part) for part in err.path)
+        else:
+            ptr = "$"
+        out.append(f"lead_artifact_schema_invalid: {source_ref} at {ptr} ({err.message})")
+    return out
+
+
+def _lead_extract_files_touched(raw: dict[str, Any]) -> list[str]:
+    files: list[str] = []
+    for key in ("files_touched", "changed_files", "untracked_files"):
+        files.extend(_lead_to_str_list(raw.get(key)))
+
+    selected_context = raw.get("selected_context_files")
+    if isinstance(selected_context, list):
+        for item in selected_context:
+            if isinstance(item, dict):
+                p = str(item.get("path") or "").strip()
+                if p:
+                    files.append(p)
+            elif isinstance(item, str):
+                p = item.strip()
+                if p:
+                    files.append(p)
+
+    return _lead_dedupe_sorted([_lead_norm_path(p) for p in files])
+
+
+def _lead_extract_claims(raw: dict[str, Any]) -> list[dict[str, str]]:
+    raw_claims = raw.get("claims")
+    if raw_claims is None:
+        raw_claims = raw.get("claims_made")
+    claims: list[dict[str, str]] = []
+    if isinstance(raw_claims, list):
+        for item in raw_claims:
+            if isinstance(item, str):
+                text = item.strip()
+                if text:
+                    claims.append({"text": text, "verification_status": "unverified"})
+            elif isinstance(item, dict):
+                text = str(item.get("claim") or item.get("text") or item.get("message") or "").strip()
+                if not text:
+                    continue
+                claims.append(
+                    {
+                        "text": text,
+                        "verification_status": _lead_status(item.get("verification_status") or item.get("status")),
+                    }
+                )
+    claims.sort(key=lambda x: (x["text"].lower(), x["verification_status"]))
+    return claims
+
+
+def _lead_extract_decisions(raw: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_decisions = raw.get("decisions")
+    if raw_decisions is None:
+        raw_decisions = raw.get("decisions_made")
+    decisions: list[dict[str, Any]] = []
+    if isinstance(raw_decisions, list):
+        for item in raw_decisions:
+            if isinstance(item, str):
+                text = item.strip()
+                if text:
+                    decisions.append({"text": text, "status": "unknown", "requires_human_approval": False})
+            elif isinstance(item, dict):
+                text = str(item.get("decision") or item.get("text") or item.get("message") or "").strip()
+                if not text:
+                    continue
+                status = _lead_status(item.get("status") or item.get("verification_status"))
+                requires_human_approval = bool(item.get("requires_human_approval")) or status == "needs_human_approval"
+                decisions.append(
+                    {
+                        "text": text,
+                        "status": status,
+                        "requires_human_approval": requires_human_approval,
+                    }
+                )
+    decisions.sort(key=lambda x: (x["text"].lower(), x["status"]))
+    return decisions
+
+
+def _lead_extract_open_loops(raw: dict[str, Any]) -> list[dict[str, str]]:
+    loops_raw = raw.get("open_loops")
+    loops: list[dict[str, str]] = []
+    if isinstance(loops_raw, list):
+        for item in loops_raw:
+            if isinstance(item, str):
+                text = item.strip()
+                if text:
+                    loops.append({"text": text, "status": "open"})
+            elif isinstance(item, dict):
+                text = str(item.get("text") or item.get("loop") or item.get("item") or "").strip()
+                if not text:
+                    continue
+                loops.append({"text": text, "status": str(item.get("status") or "open")})
+    loops.sort(key=lambda x: (x["text"].lower(), x["status"]))
+    return loops
+
+
+def _lead_extract_contradictions(raw: dict[str, Any]) -> list[str]:
+    raw_contradictions = raw.get("contradictions")
+    out: list[str] = []
+    if isinstance(raw_contradictions, list):
+        for item in raw_contradictions:
+            if isinstance(item, str):
+                text = item.strip()
+            elif isinstance(item, dict):
+                text = str(item.get("text") or item.get("claim") or item.get("message") or "").strip()
+            else:
+                text = ""
+            if text:
+                out.append(text)
+    return _lead_dedupe_sorted(out)
+
+
+def _lead_extract_git_state(raw: dict[str, Any]) -> dict[str, Any]:
+    git_state = raw.get("git_state")
+    if isinstance(git_state, dict):
+        return {
+            "available": bool(git_state.get("available", True)),
+            "commit": git_state.get("commit"),
+            "dirty": git_state.get("dirty"),
+            "changed_files": _lead_to_str_list(git_state.get("changed_files")),
+            "untracked_files": _lead_to_str_list(git_state.get("untracked_files")),
+            "reason": git_state.get("reason"),
+        }
+    return {
+        "available": bool(raw.get("git_available", False)),
+        "commit": raw.get("git_commit"),
+        "dirty": raw.get("git_dirty"),
+        "changed_files": _lead_to_str_list(raw.get("changed_files")),
+        "untracked_files": _lead_to_str_list(raw.get("untracked_files")),
+        "reason": raw.get("git_reason"),
+    }
+
+
+def _lead_normalize_artifact(raw: dict[str, Any], source_ref: str, index: int) -> dict[str, Any]:
+    claims = _lead_extract_claims(raw)
+    decisions = _lead_extract_decisions(raw)
+    open_loops = _lead_extract_open_loops(raw)
+    contradictions = _lead_extract_contradictions(raw)
+
+    task = str(raw.get("task") or "").strip()
+    timestamp = str(raw.get("timestamp") or raw.get("generated_at") or "").strip()
+    adapter = str(raw.get("adapter") or raw.get("tool") or raw.get("chat") or raw.get("agent") or "").strip()
+    verification_status = _lead_status(raw.get("verification_status") or ((raw.get("validation") or {}).get("ok")))
+
+    needs_human_approval = _lead_to_str_list(raw.get("human_approval_items"))
+    needs_human_approval.extend(_lead_to_str_list(raw.get("needs_human_approval")))
+    needs_human_approval.extend(d["text"] for d in decisions if d.get("requires_human_approval"))
+    needs_human_approval = _lead_dedupe_sorted(needs_human_approval)
+
+    run_id = str(raw.get("run_id") or "").strip()
+    if not run_id:
+        run_id = str(raw.get("receipt_hash") or "").strip()
+    if not run_id:
+        material = json.dumps(raw, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        run_id = hashlib.sha256(material + f"{source_ref}:{index}".encode("utf-8")).hexdigest()[:16]
+
+    return {
+        "run_id": run_id,
+        "timestamp": timestamp,
+        "source_artifact": source_ref,
+        "task": task or None,
+        "adapter": adapter or None,
+        "files_touched": _lead_extract_files_touched(raw),
+        "claims_made": claims,
+        "decisions_made": decisions,
+        "open_loops": open_loops,
+        "contradictions": contradictions,
+        "needs_human_approval": needs_human_approval,
+        "verification_status": verification_status,
+        "context_bundle_hash": str(raw.get("context_bundle_hash") or "") or None,
+        "receipt_hash": str(raw.get("receipt_hash") or "") or None,
+        "source_artifacts": _lead_to_str_list(raw.get("source_artifacts")),
+        "git_state": _lead_extract_git_state(raw),
+    }
+
+
+def _lead_collect_artifact_paths(root: Path, explicit: list[Path]) -> list[Path]:
+    if explicit:
+        out = []
+        for p in explicit:
+            path = p if p.is_absolute() else (root / p)
+            out.append(path.resolve())
+        unique = sorted({str(p): p for p in out}.values(), key=lambda p: str(p).lower())
+        return unique
+
+    discovered: list[Path] = []
+    discovered.extend(sorted((root / "receipts").glob("*.jsonl")))
+    discovered.extend(sorted((root / ".sticky" / "receipts").glob("*.jsonl")))
+    resolved = root / ".agentmd" / "resolved-context.json"
+    if resolved.exists():
+        discovered.append(resolved)
+    unique = sorted({str(p.resolve()): p.resolve() for p in discovered}.values(), key=lambda p: str(p).lower())
+    return unique
+
+
+def _lead_compile_packet(root: Path, artifacts: list[dict[str, Any]], task_override: str | None) -> dict[str, Any]:
+    validation = validate_workspace(root)
+
+    if not artifacts:
+        default_task = (task_override or "").strip()
+        synthetic_id_source = default_task or "no-artifacts"
+        synthetic = {
+            "run_id": hashlib.sha256(synthetic_id_source.encode("utf-8")).hexdigest()[:16],
+            "timestamp": "",
+            "source_artifact": "none",
+            "task": default_task or None,
+            "adapter": None,
+            "files_touched": [],
+            "claims_made": [],
+            "decisions_made": [],
+            "open_loops": [],
+            "contradictions": [],
+            "needs_human_approval": [],
+            "verification_status": "unknown",
+            "context_bundle_hash": None,
+            "receipt_hash": None,
+            "git_state": {
+                "available": False,
+                "commit": None,
+                "dirty": None,
+                "changed_files": [],
+                "untracked_files": [],
+                "reason": "no_artifacts",
+            },
+        }
+        artifacts = [synthetic]
+
+    artifacts_sorted = sorted(
+        artifacts,
+        key=lambda a: (str(a.get("timestamp") or ""), str(a.get("run_id") or ""), str(a.get("source_artifact") or "")),
+    )
+
+    task_candidates = [str(a.get("task") or "").strip() for a in artifacts_sorted if a.get("task")]
+    task = (task_override or "").strip() or (task_candidates[-1] if task_candidates else "unspecified task")
+
+    changed_files = _lead_dedupe_sorted([p for a in artifacts_sorted for p in a.get("files_touched", [])])
+
+    claim_statuses: dict[str, set[str]] = {}
+    claim_original: dict[str, str] = {}
+    true_claims: list[str] = []
+    unverified_claims: list[str] = []
+    contradictions: list[str] = []
+
+    for artifact in artifacts_sorted:
+        for claim in artifact.get("claims_made", []):
+            text = str(claim.get("text") or "").strip()
+            if not text:
+                continue
+            status = _lead_status(claim.get("verification_status"))
+            key = text.lower()
+            claim_statuses.setdefault(key, set()).add(status)
+            claim_original.setdefault(key, text)
+            if status == "verified":
+                true_claims.append(text)
+            elif status in {"unverified", "unknown"}:
+                unverified_claims.append(text)
+            elif status == "contradicted":
+                contradictions.append(text)
+
+    for key, statuses in claim_statuses.items():
+        if "verified" in statuses and ("contradicted" in statuses or "unverified" in statuses or "unknown" in statuses):
+            contradictions.append(claim_original[key])
+
+    contradictions.extend([c for a in artifacts_sorted for c in a.get("contradictions", [])])
+
+    open_loops_map: dict[str, dict[str, str]] = {}
+    for artifact in artifacts_sorted:
+        for loop in artifact.get("open_loops", []):
+            text = str(loop.get("text") or "").strip()
+            if not text:
+                continue
+            key = text.lower()
+            open_loops_map[key] = {"text": text, "status": str(loop.get("status") or "open")}
+    open_loops = sorted(open_loops_map.values(), key=lambda x: (x["text"].lower(), x["status"]))
+
+    needs_human_approval = []
+    for artifact in artifacts_sorted:
+        needs_human_approval.extend(artifact.get("needs_human_approval", []))
+    needs_human_approval = _lead_dedupe_sorted(needs_human_approval)
+    contradictions = _lead_dedupe_sorted(contradictions)
+    if contradictions:
+        needs_human_approval.extend([f"Resolve contradiction: {c}" for c in contradictions])
+        needs_human_approval = _lead_dedupe_sorted(needs_human_approval)
+
+    true_claims = _lead_dedupe_sorted(true_claims)
+    unverified_claims = _lead_dedupe_sorted(unverified_claims)
+
+    next_clean_action = "Proceed to the next scoped task."
+    if needs_human_approval:
+        next_clean_action = "Resolve human-approval items before the next run."
+    elif contradictions:
+        next_clean_action = "Resolve contradictions and update verified state."
+    elif unverified_claims:
+        next_clean_action = "Verify unverified claims."
+    elif open_loops:
+        next_clean_action = f"Close open loop: {open_loops[0]['text']}"
+
+    latest = artifacts_sorted[-1]
+    latest_context_bundle_hash = None
+    latest_receipt_hash = None
+    for artifact in reversed(artifacts_sorted):
+        if artifact.get("context_bundle_hash") and latest_context_bundle_hash is None:
+            latest_context_bundle_hash = artifact.get("context_bundle_hash")
+        if artifact.get("receipt_hash") and latest_receipt_hash is None:
+            latest_receipt_hash = artifact.get("receipt_hash")
+
+    latest_git_state = latest.get("git_state") or {}
+    if not isinstance(latest_git_state, dict) or (
+        latest_git_state.get("commit") is None and latest_git_state.get("dirty") is None and not latest_git_state.get("available")
+    ):
+        live_git = _git_state(root)
+        latest_git_state = {
+            "available": live_git.get("available"),
+            "commit": live_git.get("commit"),
+            "dirty": live_git.get("dirty"),
+            "changed_files": live_git.get("changed_files"),
+            "untracked_files": live_git.get("untracked_files"),
+            "reason": live_git.get("reason"),
+        }
+
+    packet = {
+        "version": "0.2",
+        "primitive": "ai_work_lead",
+        "task": task,
+        "artifacts_ingested": len(artifacts_sorted),
+        "artifact_sources": sorted({str(a.get("source_artifact") or "") for a in artifacts_sorted if a.get("source_artifact")}),
+        "artifacts": artifacts_sorted,
+        "current_state": {
+            "what_changed": changed_files,
+            "what_is_true": true_claims,
+            "what_is_unverified": unverified_claims,
+            "what_contradicts_prior_state": contradictions,
+            "what_needs_human_approval": needs_human_approval,
+            "open_loops": open_loops,
+            "next_clean_action": next_clean_action,
+        },
+        "proof": {
+            "run_id": latest.get("run_id"),
+            "timestamp": latest.get("timestamp"),
+            "context_bundle_hash": latest_context_bundle_hash,
+            "receipt_hash": latest_receipt_hash,
+            "source_artifacts": sorted({str(a.get("source_artifact") or "") for a in artifacts_sorted if a.get("source_artifact")}),
+            "git_state": {
+                "available": latest_git_state.get("available"),
+                "commit": latest_git_state.get("commit"),
+                "dirty": latest_git_state.get("dirty"),
+                "changed_files": _lead_dedupe_sorted(_lead_to_str_list(latest_git_state.get("changed_files"))),
+                "untracked_files": _lead_dedupe_sorted(_lead_to_str_list(latest_git_state.get("untracked_files"))),
+                "reason": latest_git_state.get("reason"),
+            },
+        },
+        "validation": {
+            "ok": validation["ok"],
+            "errors": validation["errors"],
+            "warnings": validation["warnings"],
+        },
+    }
+
+    material = json.dumps(packet, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    packet["deterministic_hash"] = hashlib.sha256(material).hexdigest()
+    return packet
+
+
+def _lead_current_state_markdown(packet: dict[str, Any]) -> str:
+    current = packet.get("current_state", {})
+    proof = packet.get("proof", {})
+    git_state = proof.get("git_state", {})
+
+    def lines_for_list(title: str, items: list[str]) -> list[str]:
+        out = [f"## {title}"]
+        if items:
+            out.extend([f"- {item}" for item in items])
+        else:
+            out.append("- none")
+        out.append("")
+        return out
+
+    md: list[str] = [
+        "# Sticky Current State",
+        "",
+        f"Task: {packet.get('task')}",
+        f"Deterministic Hash: {packet.get('deterministic_hash')}",
+        f"Artifacts Ingested: {packet.get('artifacts_ingested')}",
+        "",
+    ]
+
+    md.extend(lines_for_list("What Changed", current.get("what_changed", [])))
+    md.extend(lines_for_list("What Is True", current.get("what_is_true", [])))
+    md.extend(lines_for_list("What Is Unverified", current.get("what_is_unverified", [])))
+    md.extend(lines_for_list("What Contradicts Prior State", current.get("what_contradicts_prior_state", [])))
+    md.extend(lines_for_list("What Needs Human Approval", current.get("what_needs_human_approval", [])))
+
+    md.append("## Open Loops")
+    open_loops = current.get("open_loops", [])
+    if open_loops:
+        for loop in open_loops:
+            md.append(f"- {loop.get('text')} ({loop.get('status')})")
+    else:
+        md.append("- none")
+    md.append("")
+
+    md.append("## Next Clean Action")
+    md.append(f"- {current.get('next_clean_action')}")
+    md.append("")
+
+    md.append("## Proof")
+    md.append(f"- run_id: {proof.get('run_id')}")
+    md.append(f"- timestamp: {proof.get('timestamp')}")
+    md.append(f"- context_bundle_hash: {proof.get('context_bundle_hash')}")
+    md.append(f"- receipt_hash: {proof.get('receipt_hash')}")
+    md.append(f"- git_commit: {git_state.get('commit')}")
+    md.append(f"- git_dirty: {git_state.get('dirty')}")
+    md.append(f"- changed_files: {', '.join(git_state.get('changed_files', [])) or 'none'}")
+    md.append(f"- untracked_files: {', '.join(git_state.get('untracked_files', [])) or 'none'}")
+    md.append("")
+
+    md.append("## Validation")
+    validation = packet.get("validation", {})
+    md.append(f"- status: {'PASS' if validation.get('ok') else 'FAIL'}")
+    for err in validation.get("errors", []):
+        md.append(f"- error: {err}")
+    if not validation.get("errors"):
+        md.append("- errors: none")
+
+    return "\n".join(md).rstrip() + "\n"
+
+
+def _lead_write_receipt(root: Path, packet: dict[str, Any], command_run: str) -> tuple[Path, dict[str, Any]]:
+    proof = packet.get("proof", {})
+    git_state = proof.get("git_state", {})
+    timestamp = datetime.now(timezone.utc)
+    receipt = {
+        "timestamp": timestamp.isoformat().replace("+00:00", "Z"),
+        "run_id": proof.get("run_id"),
+        "task": packet.get("task"),
+        "command_run": command_run,
+        "context_bundle_hash": proof.get("context_bundle_hash"),
+        "receipt_hash_source": proof.get("receipt_hash"),
+        "current_state_hash": packet.get("deterministic_hash"),
+        "source_artifacts": proof.get("source_artifacts", []),
+        "git_commit": git_state.get("commit"),
+        "git_dirty": git_state.get("dirty"),
+        "git_available": git_state.get("available"),
+        "git_reason": git_state.get("reason"),
+        "changed_files": git_state.get("changed_files", []),
+        "untracked_files": git_state.get("untracked_files", []),
+        "validation_ok": (packet.get("validation") or {}).get("ok"),
+        "validation_errors": (packet.get("validation") or {}).get("errors", []),
+    }
+    material = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    receipt["receipt_hash"] = hashlib.sha256(material).hexdigest()
+
+    receipts_dir = root / ".sticky" / "receipts"
+    receipts_dir.mkdir(parents=True, exist_ok=True)
+    filename = timestamp.strftime("%Y%m%dT%H%M%S%fZ.jsonl")
+    out_path = receipts_dir / filename
+    out_path.write_text(json.dumps(receipt) + "\n", encoding="utf-8")
+    return out_path, receipt
+
+
+def compile_lead_state(
+    root: Path,
+    task_override: str | None,
+    artifact_paths: list[Path],
+    validate_artifacts: bool = False,
+) -> tuple[dict[str, Any], Path, Path, Path, dict[str, Any]]:
+    artifacts: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    schema_errors: list[str] = []
+    for artifact_path in _lead_collect_artifact_paths(root, artifact_paths):
+        loaded_records, loaded_warnings = _lead_load_artifacts_from_file(root, artifact_path)
+        warnings.extend(loaded_warnings)
+        for idx, (raw, source_ref) in enumerate(loaded_records, start=1):
+            if validate_artifacts:
+                try:
+                    schema_errors.extend(_lead_validate_artifact_schema(root, raw, source_ref))
+                except ValueError as e:
+                    schema_errors.append(str(e))
+            artifacts.append(_lead_normalize_artifact(raw, source_ref=source_ref, index=idx))
+
+    if validate_artifacts and warnings:
+        raise ValueError("; ".join(warnings))
+
+    if validate_artifacts and not artifacts:
+        raise ValueError("lead_artifact_input_empty: no valid artifact records loaded")
+
+    if schema_errors:
+        raise ValueError("; ".join(schema_errors))
+
+    packet = _lead_compile_packet(root, artifacts, task_override)
+    if warnings:
+        validation = packet.get("validation")
+        if isinstance(validation, dict):
+            current_warnings = validation.get("warnings")
+            if isinstance(current_warnings, list):
+                merged = sorted({*current_warnings, *warnings})
+                validation["warnings"] = merged
+
+    sticky_dir = root / ".sticky"
+    sticky_dir.mkdir(parents=True, exist_ok=True)
+    json_path = sticky_dir / "current-state.json"
+    md_path = sticky_dir / "current-state.md"
+    json_path.write_text(json.dumps(packet, indent=2), encoding="utf-8")
+    md_path.write_text(_lead_current_state_markdown(packet), encoding="utf-8")
+
+    receipt_path, receipt = _lead_write_receipt(root, packet, command_run="agentmd lead compile")
+    return packet, json_path, md_path, receipt_path, receipt
+
+
+@lead_app.command("compile")
+def lead_compile(
+    root: Path = typer.Option(Path("."), "--root", help="Workspace root"),
+    task: str | None = typer.Option(None, "--task", help="Optional task override for current-state packet"),
+    artifact: list[Path] = typer.Option(None, "--artifact", help="Artifact file (.json or .jsonl). Repeat to include multiple files."),
+    json_output: bool = typer.Option(False, "--json", help="Print compiled current-state JSON"),
+) -> None:
+    root = root.resolve()
+    artifact_paths = artifact or []
+    try:
+        packet, json_path, md_path, receipt_path, receipt = compile_lead_state(
+            root,
+            task_override=task,
+            artifact_paths=artifact_paths,
+            validate_artifacts=bool(artifact_paths),
+        )
+    except ValueError as e:
+        typer.echo(str(e))
+        raise typer.Exit(code=1)
+
+    if json_output:
+        typer.echo(json.dumps(packet, indent=2))
+        return
+
+    typer.echo(f"current_state_json: {_display_path(root, json_path)}")
+    typer.echo(f"current_state_md: {_display_path(root, md_path)}")
+    typer.echo(f"deterministic_hash: {packet['deterministic_hash']}")
+    typer.echo(f"receipt: {_display_path(root, receipt_path)}")
+    typer.echo(f"receipt_hash: {receipt['receipt_hash']}")
 
 
 @app.command()
