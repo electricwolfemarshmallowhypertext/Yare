@@ -38,7 +38,7 @@ from .geo_risk import GeoRisk
 from .async_utils import maybe_await
 from .ethics import PolicyEngine
 from .watchdog import report as watchdog_report
-from cli.agentmd import validate_workspace
+from cli.yare import validate_workspace
 
 logger = structlog.get_logger("memory.server")
 
@@ -98,7 +98,7 @@ def _load_plugins() -> Dict[str, Any]:
     return {"geo": {"enabled": True}, "ethics": {"enabled": True}, "risk": {"enabled": True}}
 
 
-def _load_latest_agentmd_receipt() -> Dict[str, Any]:
+def _load_latest_yare_receipt() -> Dict[str, Any]:
     receipts_dir = os.path.join(os.getcwd(), "receipts")
     if not os.path.isdir(receipts_dir):
         return {}
@@ -309,16 +309,16 @@ def create_app() -> FastAPI:
     async def status_public():
         return {"status": "ok", "metrics": status_snapshot()}
 
-    @app.get("/agentmd/results")
-    async def agentmd_results():
-        resolved_path = os.path.join(os.getcwd(), ".agentmd", "resolved-context.json")
+    @app.get("/yare/results")
+    async def yare_results():
+        resolved_path = os.path.join(os.getcwd(), ".yare", "resolved-context.json")
         resolved: Dict[str, Any] = {}
         if os.path.isfile(resolved_path):
             try:
                 resolved = json.loads(open(resolved_path, "r", encoding="utf-8").read())
             except Exception:
                 resolved = {}
-        latest_receipt = _load_latest_agentmd_receipt()
+        latest_receipt = _load_latest_yare_receipt()
         selected = resolved.get("selected", []) if isinstance(resolved, dict) else []
         excluded = resolved.get("excluded", []) if isinstance(resolved, dict) else []
         why_selected = [{"path": item.get("path"), "why": item.get("reason")} for item in selected]

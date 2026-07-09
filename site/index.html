@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yare | Durable Work Memory for AI Agents</title>
+  <meta name="description" content="Yare gives AI agents a clean handoff: what changed, what is true, what is unresolved, receipts, and the next clean action.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Boogaloo&family=Inter:wght@300;400;700&family=Rubik+Mono+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body id="top">
+  <nav class="site-nav" aria-label="Primary navigation">
+    <a class="nav-brand" href="#top">Yare</a>
+    <div class="nav-center">
+      <a href="#proof">Proof</a>
+      <a href="#use-cases">Use Cases</a>
+      <a href="https://github.com/electricwolfemarshmallowhypertext/Yare">GitHub</a>
+      <a href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/LICENSE">License</a>
+    </div>
+    <a class="nav-contact" href="mailto:smith@antiparty.co">Contact</a>
+  </nav>
+
+  <header class="hero">
+    <h1><span>Yare gives AI agents</span><span>a shared memory of the work.</span></h1>
+    <p>It shows what changed, what is true, what is unresolved, and what to do next — without digging through chats, logs, and guesses.</p>
+  </header>
+
+  <section class="path-section">
+    <svg id="path-trace" xmlns="http://www.w3.org/2000/svg"></svg>
+
+    <div class="box"><span class="gem-inner">Y</span></div>
+
+    <div class="mstop initial">
+      <div class="stop-card">
+        <span class="label">YARE / 01 / 06</span>
+        <h2>DURABLE WORK MEMORY</h2>
+        <p>Yare gives AI agents a clean handoff: what changed, what is true, what is unresolved, what needs human review, and what to do next.</p>
+        <div class="marker"></div>
+      </div>
+    </div>
+
+    <div class="mstop">
+      <div class="stop-card">
+        <span class="label">YARE / 02 / 06</span>
+        <h2>WHAT CHANGED</h2>
+        <p>Yare records the files, artifacts, and work state touched by coding agents, scripts, CI jobs, and human engineers.</p>
+        <div class="marker"></div>
+      </div>
+    </div>
+
+    <div class="mstop">
+      <div class="stop-card">
+        <span class="label">YARE / 03 / 06</span>
+        <h2>WHAT IS TRUE</h2>
+        <p>Yare separates verified facts from agent claims so the next agent does not have to trust a chat summary.</p>
+        <div class="marker"></div>
+      </div>
+    </div>
+
+    <div class="mstop">
+      <div class="stop-card">
+        <span class="label">YARE / 04 / 06</span>
+        <h2>WHAT IS UNRESOLVED</h2>
+        <p>Yare keeps unverified claims, contradictions, open loops, and human approval items visible instead of burying them in logs.</p>
+        <div class="marker"></div>
+      </div>
+    </div>
+
+    <div class="mstop">
+      <div class="stop-card">
+        <span class="label">YARE / 05 / 06</span>
+        <h2>NEXT CLEAN ACTION</h2>
+        <p>Yare turns scattered AI work into one current-state handoff with the next action another agent or teammate can take.</p>
+        <div class="marker"></div>
+      </div>
+    </div>
+
+    <div class="mstop" id="proof">
+      <div class="stop-card">
+        <span class="label">YARE / 06 / 06</span>
+        <h2>PROOF</h2>
+        <p>Yare stores memory in CockroachDB, archives proof artifacts to S3, and lets Claude Code, Codex, and Cursor inspect the same state through CockroachDB Managed MCP.</p>
+        <div class="marker"></div>
+      </div>
+    </div>
+
+    <div class="path-end"></div>
+  </section>
+
+  <section class="roach-proof">
+    <div>
+      <span class="proof-eyebrow">BUILT ON COCKROACHDB</span>
+      <p>Yare stores verified agent memory in <a href="https://www.cockroachlabs.com/" target="_blank" rel="noopener"><strong>CockroachDB</strong></a>, so the handoff survives tool switches, agent restarts, and messy multi-run work.</p>
+    </div>
+    <ul>
+      <li>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-cpu-icon lucide-cpu"><path d="M12 20v2"/><path d="M12 2v2"/><path d="M17 20v2"/><path d="M17 2v2"/><path d="M2 12h2"/><path d="M2 17h2"/><path d="M2 7h2"/><path d="M20 12h2"/><path d="M20 17h2"/><path d="M20 7h2"/><path d="M7 20v2"/><path d="M7 2v2"/><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg>
+        <span>Durable memory</span>
+      </li>
+      <li>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye-icon lucide-eye"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+        <span>Managed MCP access</span>
+      </li>
+      <li>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-receipt-text-icon lucide-receipt-text"><path d="M13 16H8"/><path d="M14 8H8"/><path d="M16 12H8"/><path d="M4 3a1 1 0 0 1 1-1 1.3 1.3 0 0 1 .7.2l.933.6a1.3 1.3 0 0 0 1.4 0l.934-.6a1.3 1.3 0 0 1 1.4 0l.933.6a1.3 1.3 0 0 0 1.4 0l.933-.6a1.3 1.3 0 0 1 1.4 0l.934.6a1.3 1.3 0 0 0 1.4 0l.933-.6A1.3 1.3 0 0 1 19 2a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1 1.3 1.3 0 0 1-.7-.2l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.934.6a1.3 1.3 0 0 1-1.4 0l-.933-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-1.4 0l-.934-.6a1.3 1.3 0 0 0-1.4 0l-.933.6a1.3 1.3 0 0 1-.7.2 1 1 0 0 1-1-1z"/></svg>
+        <span>Query-ready receipts</span>
+      </li>
+    </ul>
+  </section>
+
+  <div class="keep-scrolling">
+    <div class="ks-left">
+      <span class="ks-label">YARE KEEPS THE STATE CLEAR</span>
+      <h2 class="ks-headline">READY FOR<br><em>THE NEXT AGENT</em></h2>
+    </div>
+    <div class="ks-right">
+      <p class="ks-sub">Hover each line to reveal the handoff Yare preserves.</p>
+      <div class="ks-arrows">
+        <div class="ks-arr"></div>
+        <div class="ks-arr"></div>
+        <div class="ks-arr"></div>
+      </div>
+    </div>
+  </div>
+
+  <section class="clip-section" id="use-cases">
+    <span class="clip-title">YARE HANDOFF</span>
+    <h1 class="text">CHANGED<span>FILES AND ARTIFACTS</span></h1>
+    <h1 class="text">TRUE<span>VERIFIED FACTS</span></h1>
+    <h1 class="text">UNRESOLVED<span>CLAIMS AND CONTRADICTIONS</span></h1>
+    <h1 class="text">REVIEW<span>HUMAN APPROVAL ITEMS</span></h1>
+    <h1 class="text">NEXT<span>CLEAN ACTION</span></h1>
+  </section>
+
+  <section class="outro">
+    <p>YARE SAVES THE HANDOFF SO AGENTS KNOW THE REAL WORK STATE</p>
+  </section>
+
+  <footer class="site-footer">
+    <div class="footer-copy">
+      <p>&copy; 2026 Antiparty, Inc. | <strong>Yare</strong> is open source under the <strong>MIT License</strong>.</p>
+      <p><strong>Privacy:</strong> This static demo site does not collect personal data.</p>
+      <p><strong>Terms:</strong> Yare is provided as open-source software without warranty.</p>
+      <p><a href="mailto:smith@antiparty.co"><strong>Contact</strong></a></p>
+    </div>
+    <div class="footer-logo">YARE</div>
+  </footer>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/MotionPathPlugin.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

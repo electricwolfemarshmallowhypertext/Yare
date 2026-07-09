@@ -1,15 +1,15 @@
-﻿# RELEASE_CHECKLIST
+# RELEASE_CHECKLIST
 
-## AgentMD Runtime v0.2.0 RC
+## Yare v0.2.0 RC
 
 - [ ] Run local syntax check:
-  - `python -m py_compile cli/agentmd.py`
+  - `python -m py_compile cli/yare.py`
 - [ ] Run local CLI tests:
-  - `python -m pytest -q tests/agentmd/test_agentmd_cli.py`
+  - `python -m pytest -q tests/yare/test_yare_cli.py`
 - [ ] Run demo proof script:
   - `.\scripts\demo-lead-compile.ps1`
 - [ ] Verify GitHub Actions workflow run is green:
-  - `AgentMD Lead Demo` (`.github/workflows/agentmd-lead-demo.yml`)
+  - `Yare Lead Demo` (`.github/workflows/yare-lead-demo.yml`)
 - [ ] Verify workflow artifact upload contains:
   - `.sticky/current-state.json`
   - `.sticky/current-state.md`

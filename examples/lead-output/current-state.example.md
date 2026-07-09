@@ -7,7 +7,7 @@ Artifacts Ingested: 3
 ## What Changed
 - README.md
 - apps/api/src/memory/server.py
-- cli/agentmd.py
+- cli/yare.py
 - examples/lead-artifacts/run-gemini.jsonl
 
 ## What Is True
@@ -41,7 +41,7 @@ Artifacts Ingested: 3
 - receipt_hash: demo-receipt-003
 - git_commit: d505804f8c9a446a6f06adcaddd87b7327113d12
 - git_dirty: True
-- changed_files: README.md, cli/agentmd.py, tests/agentmd/test_agentmd_cli.py
+- changed_files: README.md, cli/yare.py, tests/yare/test_yare_cli.py
 - untracked_files: .sticky/, examples/lead-artifacts/, examples/lead-output/
 
 ## Validation

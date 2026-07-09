@@ -7,7 +7,7 @@ import logging as _logging
 
 class _CompatLogger:
     def __init__(self, name: str | None = None) -> None:
-        self._logger = _logging.getLogger(name or "agentmd")
+        self._logger = _logging.getLogger(name or "yare")
 
     def bind(self, **_: object) -> "_CompatLogger":
         return self

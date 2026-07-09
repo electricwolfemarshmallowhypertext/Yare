@@ -4,7 +4,7 @@ Status: **PARTIALLY IMPLEMENTED**
 
 ## Purpose
 
-AgentMD treats `skills/*/SKILL.md` files as external agent state.
+Yare treats `skills/*/SKILL.md` files as external agent state.
 v0.3 starts with a controlled skill-edit gate and keeps strict bounds to avoid uncontrolled self-evolving behavior.
 
 ## Core loop
@@ -33,9 +33,9 @@ skill file
 - Accepted edits generate a skill receipt with hashes, score delta, and validation summary.
 - After a skill version is accepted, runtime execution should not require extra model calls for optimization during normal use.
 
-## AgentMD alignment
+## Yare alignment
 
-This direction maps directly onto AgentMD primitives already in place:
+This direction maps directly onto Yare primitives already in place:
 
 - `skills/` for skill state
 - validation/evals for scoring and gates
@@ -44,7 +44,7 @@ This direction maps directly onto AgentMD primitives already in place:
 
 ## Implemented now
 
-- `agentmd skill apply-edit --edit <path>` command.
+- `yare skill apply-edit --edit <path>` command.
 - Schema-validated edit payloads via `schemas/skill-edit.schema.json`.
 - Bounded edit operations only:
   - add

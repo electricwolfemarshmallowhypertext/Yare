@@ -1,4 +1,4 @@
-name: AgentMD Lead Demo
+name: Yare Lead Demo
 
 on:
   workflow_dispatch:
@@ -27,11 +27,11 @@ jobs:
 
       - name: Validate CLI syntax
         shell: pwsh
-        run: python -m py_compile cli/agentmd.py
+        run: python -m py_compile cli/yare.py
 
-      - name: Run AgentMD CLI tests
+      - name: Run Yare CLI tests
         shell: pwsh
-        run: python -m pytest -q tests/agentmd/test_agentmd_cli.py
+        run: python -m pytest -q tests/yare/test_yare_cli.py
 
       - name: Run AI Work Lead demo
         shell: pwsh
@@ -40,7 +40,7 @@ jobs:
       - name: Upload AI Work Lead proof artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: agentmd-lead-proof
+          name: yare-lead-proof
           if-no-files-found: error
           include-hidden-files: true
           path: |
