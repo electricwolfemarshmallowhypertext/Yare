@@ -20,9 +20,11 @@ app = typer.Typer(add_completion=False, help="Yare context governance runtime CL
 lead_app = typer.Typer(add_completion=False, help="AI Work Lead primitives")
 skill_app = typer.Typer(add_completion=False, help="Skill optimization gates")
 storage_app = typer.Typer(add_completion=False, help="CockroachDB durable memory storage")
+memory_app = typer.Typer(add_completion=False, help="Search CockroachDB-backed Yare memory")
 app.add_typer(lead_app, name="lead")
 app.add_typer(skill_app, name="skill")
 app.add_typer(storage_app, name="storage")
+app.add_typer(memory_app, name="memory")
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "version": 1,
@@ -1542,6 +1544,104 @@ def storage_init() -> None:
         raise typer.Exit(code=1)
     typer.echo("storage: initialized")
     typer.echo(f"tables: {', '.join(storage_backend.SCHEMA_TABLES)}")
+
+
+@memory_app.command("search")
+def memory_search(
+    query: str = typer.Option(..., "--query", help="Search query for prior agent memory"),
+    limit: int = typer.Option(3, "--limit", min=1, help="Maximum results to return"),
+) -> None:
+    try:
+        results = storage_backend.search_memory(query=query, limit=limit)
+    except storage_backend.StorageError as e:
+        typer.echo(str(e))
+        raise typer.Exit(code=1)
+
+    if not results:
+        typer.echo("memory_search: no results")
+        return
+
+    for idx, result in enumerate(results, start=1):
+        typer.echo(f"result: {idx}")
+        typer.echo(f"section: {result['section_name']}")
+        typer.echo(f"distance: {result['distance']:.6f}")
+        typer.echo(f"current_state_hash: {result['current_state_hash']}")
+        typer.echo("text:")
+        typer.echo(str(result["source_text"]))
+        if idx != len(results):
+            typer.echo("")
+
+
+@memory_app.command("timeline")
+def memory_timeline(
+    limit: int = typer.Option(25, "--limit", min=1, help="Maximum timeline states to print"),
+) -> None:
+    try:
+        rows = storage_backend.memory_timeline(limit=limit)
+    except storage_backend.StorageError as e:
+        typer.echo(str(e))
+        raise typer.Exit(code=1)
+
+    if not rows:
+        typer.echo("memory_timeline: no states")
+        return
+
+    for row in rows:
+        typer.echo(f"state_hash: {row['state_hash']}")
+        typer.echo(f"created_at: {row['created_at']}")
+        typer.echo(f"task: {row['task']}")
+        typer.echo(f"run_id: {row['run_id']}")
+        typer.echo(f"receipt_hash: {row['receipt_hash']}")
+        typer.echo(f"changed_files_count: {row['changed_files_count']}")
+        typer.echo(f"verified_facts_count: {row['verified_facts_count']}")
+        typer.echo(f"unresolved_claims_count: {row['unresolved_claims_count']}")
+        typer.echo(f"contradictions_count: {row['contradictions_count']}")
+        typer.echo(f"human_approval_count: {row['human_approval_count']}")
+        typer.echo(f"next_clean_action: {row['next_clean_action']}")
+        if row != rows[-1]:
+            typer.echo("")
+
+
+def _echo_list(title: str, items: list[str]) -> None:
+    typer.echo(f"{title}:")
+    if items:
+        for item in items:
+            typer.echo(f"- {item}")
+    else:
+        typer.echo("- none")
+
+
+@memory_app.command("diff")
+def memory_diff(
+    latest: bool = typer.Option(False, "--latest", help="Compare latest current state to the previous one"),
+) -> None:
+    if not latest:
+        typer.echo("memory_diff_requires_latest: pass --latest")
+        raise typer.Exit(code=1)
+
+    try:
+        diff = storage_backend.latest_memory_diff()
+    except storage_backend.StorageError as e:
+        typer.echo(str(e))
+        raise typer.Exit(code=1)
+
+    typer.echo(f"previous_state_hash: {diff['previous_state_hash']}")
+    typer.echo(f"latest_state_hash: {diff['latest_state_hash']}")
+    _echo_list("new_truths", diff["new_truths"])
+    _echo_list("removed_truths", diff["removed_truths"])
+    _echo_list("still_unresolved", diff["still_unresolved"])
+    _echo_list("new_unresolved_claims", diff["new_unresolved_claims"])
+    _echo_list("resolved_claims", diff["resolved_claims"])
+    _echo_list("new_contradictions", diff["new_contradictions"])
+    _echo_list("cleared_contradictions", diff["cleared_contradictions"])
+    _echo_list("new_approval_items", diff["new_approval_items"])
+    if diff["next_clean_action_changed"]:
+        typer.echo(
+            "next_clean_action_changed: "
+            f"{diff['next_clean_action_previous']} -> {diff['next_clean_action_latest']}"
+        )
+    else:
+        typer.echo(f"next_clean_action_changed: no ({diff['next_clean_action_latest']})")
 
 
 @lead_app.command("compile")

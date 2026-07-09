@@ -881,6 +881,229 @@ def test_storage_persist_executes_schema_and_inserts_with_stubbed_connection() -
     assert "INSERT INTO yare_receipts" in sql
 
 
+def test_storage_persist_writes_memory_vectors_with_stubbed_connection() -> None:
+    calls: list[tuple[str, object]] = []
+
+    def fake_connect(database_url: str) -> FakeConnection:
+        assert database_url == "postgresql://example"
+        return FakeConnection(calls)
+
+    packet = {
+        "task": "persist searchable memory",
+        "deterministic_hash": "state-hash",
+        "current_state": {
+            "what_changed": ["cli/yare.py"],
+            "what_is_true": ["storage init creates tables"],
+            "what_is_unverified": ["CI passed"],
+            "what_contradicts_prior_state": ["receipt status"],
+            "what_needs_human_approval": ["Approve release"],
+            "open_loops": [{"text": "Add smoke test", "status": "open"}],
+            "next_clean_action": "Resolve human-approval items before the next run.",
+        },
+        "proof": {"run_id": "run-db-1"},
+    }
+
+    persisted = storage_backend.persist_lead_compile(
+        packet=packet,
+        artifacts=[],
+        receipt={"receipt_hash": "receipt-hash"},
+        database_url="postgresql://example",
+        connect_func=fake_connect,
+    )
+
+    sql = "\n".join(call[0] for call in calls)
+    vector_params = [params for statement, params in calls if "INSERT INTO yare_memory_vectors" in statement]
+    assert persisted is True
+    assert "CREATE TABLE IF NOT EXISTS yare_memory_vectors" in sql
+    assert "VECTOR INDEX yare_memory_vectors_embedding_idx" in sql
+    assert len(vector_params) == 7
+    assert vector_params[0][2] == "what changed"
+    assert vector_params[-1][2] == "next clean action"
+    assert str(vector_params[0][4]).startswith("[")
+
+
+class SearchCursor:
+    def __init__(self, calls: list[tuple[str, object]]) -> None:
+        self.calls = calls
+
+    def __enter__(self) -> "SearchCursor":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        return None
+
+    def execute(self, sql: str, params: object = None) -> None:
+        self.calls.append((sql, params))
+
+    def fetchall(self) -> list[tuple[str, float, str, str]]:
+        return [("human approval items", 0.12, "state-hash", "Approve release")]
+
+
+class SearchConnection:
+    def __init__(self, calls: list[tuple[str, object]]) -> None:
+        self.calls = calls
+
+    def __enter__(self) -> "SearchConnection":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        return None
+
+    def cursor(self) -> SearchCursor:
+        return SearchCursor(self.calls)
+
+
+def test_memory_search_uses_vector_distance_with_stubbed_connection() -> None:
+    calls: list[tuple[str, object]] = []
+
+    def fake_connect(database_url: str) -> SearchConnection:
+        assert database_url == "postgresql://example"
+        return SearchConnection(calls)
+
+    rows = storage_backend.search_memory(
+        query="what still needs human review?",
+        limit=3,
+        database_url="postgresql://example",
+        connect_func=fake_connect,
+    )
+
+    sql, params = calls[0]
+    assert "ORDER BY embedding <=> %s::VECTOR" in sql
+    assert params[2] == 3
+    assert rows == [
+        {
+            "section_name": "human approval items",
+            "distance": 0.12,
+            "current_state_hash": "state-hash",
+            "source_text": "Approve release",
+        }
+    ]
+
+
+def test_memory_search_command_prints_results(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_search_memory(query: str, limit: int) -> list[dict[str, object]]:
+        assert query == "what still needs human review?"
+        assert limit == 3
+        return [
+            {
+                "section_name": "human approval items",
+                "distance": 0.12,
+                "current_state_hash": "state-hash",
+                "source_text": "Approve release",
+            }
+        ]
+
+    monkeypatch.setattr(storage_backend, "search_memory", fake_search_memory)
+
+    result = runner.invoke(
+        app,
+        ["memory", "search", "--query", "what still needs human review?", "--limit", "3"],
+    )
+
+    assert result.exit_code == 0
+    assert "section: human approval items" in result.stdout
+    assert "distance: 0.120000" in result.stdout
+    assert "current_state_hash: state-hash" in result.stdout
+    assert "Approve release" in result.stdout
+
+
+def test_memory_diff_logic_compares_previous_and_latest_state() -> None:
+    previous = {
+        "state_hash": "previous-hash",
+        "state": {
+            "what_is_true": ["README documents compile"],
+            "what_is_unverified": ["CI passed", "endpoint smoke exists"],
+            "what_contradicts_prior_state": ["receipt dirty status"],
+            "what_needs_human_approval": ["Approve release"],
+            "next_clean_action": "Verify unverified claims.",
+        },
+    }
+    latest = {
+        "state_hash": "latest-hash",
+        "state": {
+            "what_is_true": ["README documents compile", "CI passed"],
+            "what_is_unverified": ["endpoint smoke exists", "S3 proof exists"],
+            "what_contradicts_prior_state": [],
+            "what_needs_human_approval": ["Approve release", "Review S3 proof"],
+            "next_clean_action": "Resolve human-approval items before the next run.",
+        },
+    }
+
+    diff = storage_backend.diff_states(previous, latest)
+
+    assert diff["previous_state_hash"] == "previous-hash"
+    assert diff["latest_state_hash"] == "latest-hash"
+    assert diff["new_truths"] == ["CI passed"]
+    assert diff["removed_truths"] == []
+    assert diff["still_unresolved"] == ["endpoint smoke exists"]
+    assert diff["new_unresolved_claims"] == ["S3 proof exists"]
+    assert diff["resolved_claims"] == ["CI passed"]
+    assert diff["new_contradictions"] == []
+    assert diff["cleared_contradictions"] == ["receipt dirty status"]
+    assert diff["new_approval_items"] == ["Review S3 proof"]
+    assert diff["next_clean_action_changed"] is True
+
+
+def test_memory_timeline_command_prints_counts(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_memory_timeline(limit: int) -> list[dict[str, object]]:
+        assert limit == 25
+        return [
+            {
+                "state_hash": "state-1",
+                "created_at": "2026-07-09T12:00:00Z",
+                "task": "compile ai work lead state",
+                "run_id": "demo-run-001",
+                "receipt_hash": "receipt-1",
+                "changed_files_count": 2,
+                "verified_facts_count": 1,
+                "unresolved_claims_count": 1,
+                "contradictions_count": 0,
+                "human_approval_count": 1,
+                "next_clean_action": "Verify unverified claims.",
+            }
+        ]
+
+    monkeypatch.setattr(storage_backend, "memory_timeline", fake_memory_timeline)
+
+    result = runner.invoke(app, ["memory", "timeline"])
+
+    assert result.exit_code == 0
+    assert "state_hash: state-1" in result.stdout
+    assert "changed_files_count: 2" in result.stdout
+    assert "verified_facts_count: 1" in result.stdout
+    assert "next_clean_action: Verify unverified claims." in result.stdout
+
+
+def test_memory_diff_command_prints_latest_diff(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_latest_memory_diff() -> dict[str, object]:
+        return {
+            "previous_state_hash": "previous-hash",
+            "latest_state_hash": "latest-hash",
+            "new_truths": ["CI passed"],
+            "removed_truths": [],
+            "still_unresolved": ["endpoint smoke exists"],
+            "new_unresolved_claims": ["S3 proof exists"],
+            "resolved_claims": ["old claim"],
+            "new_contradictions": ["receipt dirty status"],
+            "cleared_contradictions": [],
+            "new_approval_items": ["Review S3 proof"],
+            "next_clean_action_previous": "Verify unverified claims.",
+            "next_clean_action_latest": "Resolve human-approval items before the next run.",
+            "next_clean_action_changed": True,
+        }
+
+    monkeypatch.setattr(storage_backend, "latest_memory_diff", fake_latest_memory_diff)
+
+    result = runner.invoke(app, ["memory", "diff", "--latest"])
+
+    assert result.exit_code == 0
+    assert "previous_state_hash: previous-hash" in result.stdout
+    assert "latest_state_hash: latest-hash" in result.stdout
+    assert "new_truths:" in result.stdout
+    assert "- CI passed" in result.stdout
+    assert "next_clean_action_changed: Verify unverified claims. -> Resolve human-approval items before the next run." in result.stdout
+
+
 def test_s3_archive_skips_when_bucket_unset(ws: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("YARE_S3_BUCKET", raising=False)
     state_json = ws / "current-state.json"
