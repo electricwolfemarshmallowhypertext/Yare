@@ -1,4 +1,4 @@
-# AgentMD: compiling scattered AI runs into one verified current-state packet
+# Yare: verified work-state memory for agents
 
 ## 1. Problem
 
@@ -7,7 +7,7 @@ The failure mode is losing the actual current state of work.
 
 ## 2. Claim
 
-AgentMD compiles scattered AI/tool run artifacts into one deterministic current-state packet.
+Yare turns scattered AI work into verified working memory. It compiles scattered AI/tool run artifacts into one deterministic current-state packet.
 
 ## 3. Proof task
 
@@ -19,9 +19,9 @@ Baseline:
 
 - human reads artifacts manually
 
-AgentMD path:
+Yare path:
 
-- `agentmd lead compile` via the demo script
+- `yare lead compile` via the demo script
 
 ## 4. Demo inputs and reference outputs
 
@@ -36,7 +36,7 @@ Reference outputs:
 - `examples/lead-output/current-state.example.md`
 - `examples/lead-output/current-state.example.json`
 
-## 5. Before → After
+## 5. Before -> After
 
 Before:
 
@@ -73,7 +73,7 @@ Artifacts Ingested: 3
 ## What Changed
 - README.md
 - apps/api/src/memory/server.py
-- cli/agentmd.py
+- cli/yare.py
 
 ## What Is True
 - Endpoint returns latest receipt
@@ -134,15 +134,15 @@ Schema:
 ## 12. CI and release proof
 
 - CI: green
-- AgentMD Lead Demo: green
-- GitHub Actions: `https://github.com/electricwolfemarshmallowhypertext/agentmd-runtime/actions`
+- Yare Lead Demo: green
+- GitHub Actions: `https://github.com/electricwolfemarshmallowhypertext/yare/actions`
 - Release: `v0.3.0-alpha.2`
-- Release URL: `https://github.com/electricwolfemarshmallowhypertext/agentmd-runtime/releases/tag/v0.3.0-alpha.2`
+- Release URL: `https://github.com/electricwolfemarshmallowhypertext/yare/releases/tag/v0.3.0-alpha.2`
 
 Current verified facts:
 
 - tests: `20 passed`
-- workflows: CI green, AgentMD Lead Demo green
+- workflows: CI green, Yare Lead Demo green
 - latest release: `v0.3.0-alpha.2`
 - latest release commit: `6efc66d`
 

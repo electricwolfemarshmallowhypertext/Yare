@@ -12,7 +12,9 @@ from typer.testing import CliRunner
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from cli.agentmd import app
+from cli import archive as archive_backend
+from cli import storage as storage_backend
+from cli.yare import app
 
 
 runner = CliRunner()
@@ -21,7 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 @pytest.fixture()
 def ws() -> Path:
-    base = REPO_ROOT / ".tmp" / "agentmd-tests"
+    base = REPO_ROOT / ".tmp" / "yare-tests"
     base.mkdir(parents=True, exist_ok=True)
     path = Path(tempfile.mkdtemp(prefix="case-", dir=base))
     try:
@@ -32,7 +34,7 @@ def ws() -> Path:
 
 def scaffold_workspace(root: Path) -> None:
     (root / "AGENTS.md").write_text("# Agents\n", encoding="utf-8")
-    (root / "agentmd.yaml").write_text(
+    (root / "yare.yaml").write_text(
         "\n".join(
             [
                 "version: 1",
@@ -142,7 +144,7 @@ def test_doctor_fails_duplicate_skill_ids(ws: Path) -> None:
 
 def test_resolve_includes_selected_and_excluded_reasons(ws: Path) -> None:
     scaffold_workspace(ws)
-    (ws / "agentmd.yaml").write_text(
+    (ws / "yare.yaml").write_text(
         "\n".join(
             [
                 "version: 1",
@@ -717,3 +719,258 @@ def test_skill_apply_edit_fails_for_ambiguous_or_missing_target(ws: Path) -> Non
     missing_result = runner.invoke(app, ["skill", "apply-edit", "--root", str(ws), "--edit", str(missing_edit)])
     assert missing_result.exit_code == 1
     assert "skill_edit_target_not_found" in missing_result.stdout
+
+
+def test_storage_init_requires_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("YARE_DATABASE_URL", raising=False)
+
+    result = runner.invoke(app, ["storage", "init"])
+
+    assert result.exit_code == 1
+    assert "YARE_DATABASE_URL" in result.stdout
+
+
+def test_storage_init_command_initializes_tables(monkeypatch: pytest.MonkeyPatch) -> None:
+    called = {}
+
+    def fake_init_schema() -> None:
+        called["ok"] = True
+
+    monkeypatch.setattr(storage_backend, "init_schema", fake_init_schema)
+
+    result = runner.invoke(app, ["storage", "init"])
+
+    assert result.exit_code == 0
+    assert called["ok"] is True
+    assert "yare_runs" in result.stdout
+    assert "yare_receipts" in result.stdout
+
+
+def test_lead_compile_persists_when_database_url_is_set(ws: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    scaffold_workspace(ws)
+    artifact_path = ws / "artifact.jsonl"
+    artifact_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "lead-artifact.v1",
+                "run_id": "run-db-1",
+                "tool": "codex",
+                "timestamp": "2026-05-20T00:00:00Z",
+                "task": "persist durable memory",
+                "claims": [{"claim": "state compiled", "verification_status": "verified"}],
+                "decisions": [],
+                "files_touched": ["AGENTS.md"],
+                "open_loops": [],
+                "contradictions": [],
+                "human_approval_items": [],
+                "verification_status": "verified",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    captured: dict[str, object] = {}
+
+    def fake_persist_lead_compile(
+        *,
+        packet: dict[str, object],
+        artifacts: list[dict[str, object]],
+        receipt: dict[str, object],
+    ) -> bool:
+        captured["packet"] = packet
+        captured["artifacts"] = artifacts
+        captured["receipt"] = receipt
+        return True
+
+    monkeypatch.setenv("YARE_DATABASE_URL", "postgresql://example")
+    monkeypatch.setattr(storage_backend, "persist_lead_compile", fake_persist_lead_compile)
+
+    result = runner.invoke(app, ["lead", "compile", "--root", str(ws), "--artifact", str(artifact_path)])
+
+    assert result.exit_code == 0
+    packet = captured["packet"]
+    artifacts = captured["artifacts"]
+    receipt = captured["receipt"]
+    assert isinstance(packet, dict)
+    assert isinstance(artifacts, list)
+    assert isinstance(receipt, dict)
+    assert packet["task"] == "persist durable memory"
+    assert packet["deterministic_hash"]
+    assert artifacts[0]["run_id"] == "run-db-1"
+    assert receipt["receipt_hash"]
+    assert (ws / ".sticky" / "current-state.json").exists()
+
+
+def test_storage_persist_skips_when_database_url_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("YARE_DATABASE_URL", raising=False)
+
+    persisted = storage_backend.persist_lead_compile(packet={}, artifacts=[], receipt={})
+
+    assert persisted is False
+
+
+class FakeCursor:
+    def __init__(self, calls: list[tuple[str, object]]) -> None:
+        self.calls = calls
+
+    def __enter__(self) -> "FakeCursor":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        return None
+
+    def execute(self, sql: str, params: object = None) -> None:
+        self.calls.append((sql, params))
+
+
+class FakeConnection:
+    def __init__(self, calls: list[tuple[str, object]]) -> None:
+        self.calls = calls
+        self.commits = 0
+
+    def __enter__(self) -> "FakeConnection":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        return None
+
+    def cursor(self) -> FakeCursor:
+        return FakeCursor(self.calls)
+
+    def commit(self) -> None:
+        self.commits += 1
+
+
+def test_storage_persist_executes_schema_and_inserts_with_stubbed_connection() -> None:
+    calls: list[tuple[str, object]] = []
+    connections: list[FakeConnection] = []
+
+    def fake_connect(database_url: str) -> FakeConnection:
+        assert database_url == "postgresql://example"
+        conn = FakeConnection(calls)
+        connections.append(conn)
+        return conn
+
+    packet = {
+        "task": "persist durable memory",
+        "deterministic_hash": "state-hash",
+        "current_state": {"next_clean_action": "ship it"},
+        "proof": {"run_id": "run-db-1"},
+    }
+    artifacts = [{"run_id": "run-db-1", "source_artifact": "artifact.jsonl:1"}]
+    receipt = {"receipt_hash": "receipt-hash", "current_state_hash": "state-hash"}
+
+    persisted = storage_backend.persist_lead_compile(
+        packet=packet,
+        artifacts=artifacts,
+        receipt=receipt,
+        database_url="postgresql://example",
+        connect_func=fake_connect,
+    )
+
+    sql = "\n".join(call[0] for call in calls)
+    assert persisted is True
+    assert connections[0].commits == 1
+    assert "CREATE TABLE IF NOT EXISTS yare_runs" in sql
+    assert "CREATE TABLE IF NOT EXISTS yare_lead_artifacts" in sql
+    assert "CREATE TABLE IF NOT EXISTS yare_current_states" in sql
+    assert "CREATE TABLE IF NOT EXISTS yare_receipts" in sql
+    assert "INSERT INTO yare_runs" in sql
+    assert "INSERT INTO yare_lead_artifacts" in sql
+    assert "INSERT INTO yare_current_states" in sql
+    assert "INSERT INTO yare_receipts" in sql
+
+
+def test_s3_archive_skips_when_bucket_unset(ws: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("YARE_S3_BUCKET", raising=False)
+    state_json = ws / "current-state.json"
+    state_md = ws / "current-state.md"
+    receipt = ws / "receipt.jsonl"
+    state_json.write_text("{}", encoding="utf-8")
+    state_md.write_text("# state\n", encoding="utf-8")
+    receipt.write_text("{}\n", encoding="utf-8")
+
+    uris = archive_backend.archive_lead_compile(
+        packet={"deterministic_hash": "hash-1"},
+        json_path=state_json,
+        md_path=state_md,
+        receipt_path=receipt,
+    )
+
+    assert uris == []
+
+
+class FakeS3Client:
+    def __init__(self) -> None:
+        self.uploads: list[tuple[str, str, str]] = []
+
+    def upload_file(self, filename: str, bucket: str, key: str) -> None:
+        self.uploads.append((filename, bucket, key))
+
+
+def test_s3_archive_uploads_expected_keys(ws: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("YARE_S3_BUCKET", "example-bucket")
+    monkeypatch.delenv("YARE_S3_PREFIX", raising=False)
+    state_json = ws / "current-state.json"
+    state_md = ws / "current-state.md"
+    receipt = ws / "receipt.jsonl"
+    state_json.write_text("{}", encoding="utf-8")
+    state_md.write_text("# state\n", encoding="utf-8")
+    receipt.write_text("{}\n", encoding="utf-8")
+    client = FakeS3Client()
+
+    uris = archive_backend.archive_lead_compile(
+        packet={"deterministic_hash": "hash-1"},
+        json_path=state_json,
+        md_path=state_md,
+        receipt_path=receipt,
+        client=client,
+    )
+
+    keys = [upload[2] for upload in client.uploads]
+    assert keys == [
+        "yare/current-states/hash-1/current-state.json",
+        "yare/current-states/hash-1/current-state.md",
+        "yare/current-states/hash-1/receipt.jsonl",
+    ]
+    assert uris == [
+        "s3://example-bucket/yare/current-states/hash-1/current-state.json",
+        "s3://example-bucket/yare/current-states/hash-1/current-state.md",
+        "s3://example-bucket/yare/current-states/hash-1/receipt.jsonl",
+    ]
+
+
+def test_s3_archive_honors_custom_prefix(ws: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("YARE_S3_BUCKET", "example-bucket")
+    monkeypatch.setenv("YARE_S3_PREFIX", "demo/prefix")
+    state_json = ws / "current-state.json"
+    state_md = ws / "current-state.md"
+    receipt = ws / "receipt.jsonl"
+    state_json.write_text("{}", encoding="utf-8")
+    state_md.write_text("# state\n", encoding="utf-8")
+    receipt.write_text("{}\n", encoding="utf-8")
+    client = FakeS3Client()
+
+    archive_backend.archive_lead_compile(
+        packet={"deterministic_hash": "hash-1"},
+        json_path=state_json,
+        md_path=state_md,
+        receipt_path=receipt,
+        client=client,
+    )
+
+    assert client.uploads[0][2] == "demo/prefix/current-states/hash-1/current-state.json"
+
+
+def test_lead_compile_prints_s3_uris(ws: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    scaffold_workspace(ws)
+
+    def fake_archive_lead_compile(**kwargs: object) -> list[str]:
+        return ["s3://example-bucket/yare/current-states/hash/current-state.json"]
+
+    monkeypatch.setattr(archive_backend, "archive_lead_compile", fake_archive_lead_compile)
+
+    result = runner.invoke(app, ["lead", "compile", "--root", str(ws), "--task", "archive state"])
+
+    assert result.exit_code == 0
+    assert "s3_uri: s3://example-bucket/yare/current-states/hash/current-state.json" in result.stdout

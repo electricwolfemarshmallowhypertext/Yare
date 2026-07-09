@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>AgentMD Explainable Results</title>
+  <title>Yare Explainable Results</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -229,8 +229,8 @@
   <main class="wrap">
     <section class="hero">
       <div>
-        <h1>AgentMD Explainable Results</h1>
-        <p class="sub">Context selection trace for the latest AgentMD run, including selection rationale, exclusions, validation posture, and receipt integrity metadata.</p>
+        <h1>Yare Explainable Results</h1>
+        <p class="sub">Context selection trace for the latest Yare run, including selection rationale, exclusions, validation posture, and receipt integrity metadata.</p>
       </div>
       <a class="link" href="/dashboard/dashboard.html">Back to Runtime Dashboard</a>
     </section>
@@ -505,13 +505,13 @@
     async function init() {
       const errorBox = document.getElementById("errorBox");
       try {
-        const res = await fetch("/agentmd/results");
+        const res = await fetch("/yare/results");
         if (!res.ok) throw new Error("HTTP " + res.status);
         const data = await res.json();
         render(data);
       } catch (err) {
         errorBox.style.display = "block";
-        errorBox.textContent = "Unable to load /agentmd/results: " + String(err);
+        errorBox.textContent = "Unable to load /yare/results: " + String(err);
       }
     }
 

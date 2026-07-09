@@ -24,12 +24,12 @@ $args = @(
     "examples/lead-artifacts/run-gemini.jsonl"
 )
 
-$output = & .\agentmd.cmd @args 2>&1
+$output = & .\yare.cmd @args 2>&1
 $exitCode = $LASTEXITCODE
 $output | ForEach-Object { Write-Output $_ }
 
 if ($exitCode -ne 0) {
-    throw "agentmd lead compile failed with exit code $exitCode"
+    throw "yare lead compile failed with exit code $exitCode"
 }
 
 $deterministicHash = $null

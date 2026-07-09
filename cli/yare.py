@@ -13,11 +13,16 @@ from typing import Any
 import typer
 import yaml
 
-app = typer.Typer(add_completion=False, help="AgentMD context governance runtime CLI")
+from cli import archive as archive_backend
+from cli import storage as storage_backend
+
+app = typer.Typer(add_completion=False, help="Yare context governance runtime CLI")
 lead_app = typer.Typer(add_completion=False, help="AI Work Lead primitives")
 skill_app = typer.Typer(add_completion=False, help="Skill optimization gates")
+storage_app = typer.Typer(add_completion=False, help="CockroachDB durable memory storage")
 app.add_typer(lead_app, name="lead")
 app.add_typer(skill_app, name="skill")
+app.add_typer(storage_app, name="storage")
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "version": 1,
@@ -95,7 +100,7 @@ def _bundle_hash(selected_items: list[dict[str, Any]]) -> str:
 
 
 def _resolved_pointer_path(root: Path) -> Path:
-    return root / ".agentmd" / "last-resolved-path.txt"
+    return root / ".yare" / "last-resolved-path.txt"
 
 
 def _write_resolved_pointer(root: Path, resolved_path: Path) -> None:
@@ -135,7 +140,7 @@ def _merge_dict(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any
 
 
 def _load_config(root: Path) -> dict[str, Any]:
-    path = root / "agentmd.yaml"
+    path = root / "yare.yaml"
     if not path.exists():
         return dict(DEFAULT_CONFIG)
     try:
@@ -239,9 +244,9 @@ def validate_workspace(root: Path) -> dict[str, Any]:
             errors.append(f"{name}: {detail}")
 
     agents_path = root / "AGENTS.md"
-    agentmd_path = root / "agentmd.yaml"
+    yare_path = root / "yare.yaml"
     check("agents_exists", agents_path.exists(), "present" if agents_path.exists() else "AGENTS.md missing")
-    check("agentmd_config_exists", agentmd_path.exists(), "present" if agentmd_path.exists() else "agentmd.yaml missing")
+    check("yare_config_exists", yare_path.exists(), "present" if yare_path.exists() else "yare.yaml missing")
 
     # Required folders for v1.
     for folder in ("skills", "memory", "policies", "evals", "receipts"):
@@ -488,7 +493,7 @@ def resolve_context(root: Path, task: str, output_path: Path | None = None) -> t
         "validation": {"ok": validation["ok"], "errors": validation["errors"], "warnings": validation["warnings"]},
     }
     output["context_bundle_hash"] = _bundle_hash(selected)
-    out_path = output_path if output_path is not None else Path(".agentmd/resolved-context.json")
+    out_path = output_path if output_path is not None else Path(".yare/resolved-context.json")
     if not out_path.is_absolute():
         out_path = root / out_path
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -551,7 +556,7 @@ def _load_resolved(root: Path) -> tuple[dict[str, Any] | None, Path | None]:
     ptr_path = _read_resolved_pointer(root)
     if ptr_path is not None:
         candidates.append(ptr_path)
-    candidates.append(root / ".agentmd" / "resolved-context.json")
+    candidates.append(root / ".yare" / "resolved-context.json")
     seen: set[str] = set()
     for path in candidates:
         key = str(path.resolve())
@@ -744,7 +749,7 @@ def apply_skill_edit(root: Path, edit_path: Path) -> tuple[str, Path, dict[str, 
 
     temp_parent = root / ".tmp" / "skill-edit-temp"
     temp_parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="agentmd-skill-edit-", dir=temp_parent) as tmp_dir:
+    with tempfile.TemporaryDirectory(prefix="yare-skill-edit-", dir=temp_parent) as tmp_dir:
         tmp_path = Path(tmp_dir) / skill_file.name
         tmp_path.write_text(old_text, encoding="utf-8")
         new_text = _apply_bounded_skill_edit(old_text, edit_type, target, replacement)
@@ -1200,7 +1205,7 @@ def _lead_collect_artifact_paths(root: Path, explicit: list[Path]) -> list[Path]
     discovered: list[Path] = []
     discovered.extend(sorted((root / "receipts").glob("*.jsonl")))
     discovered.extend(sorted((root / ".sticky" / "receipts").glob("*.jsonl")))
-    resolved = root / ".agentmd" / "resolved-context.json"
+    resolved = root / ".yare" / "resolved-context.json"
     if resolved.exists():
         discovered.append(resolved)
     unique = sorted({str(p.resolve()): p.resolve() for p in discovered}.values(), key=lambda p: str(p).lower())
@@ -1477,7 +1482,7 @@ def compile_lead_state(
     task_override: str | None,
     artifact_paths: list[Path],
     validate_artifacts: bool = False,
-) -> tuple[dict[str, Any], Path, Path, Path, dict[str, Any]]:
+) -> tuple[dict[str, Any], Path, Path, Path, dict[str, Any], list[str]]:
     artifacts: list[dict[str, Any]] = []
     warnings: list[str] = []
     schema_errors: list[str] = []
@@ -1517,8 +1522,26 @@ def compile_lead_state(
     json_path.write_text(json.dumps(packet, indent=2), encoding="utf-8")
     md_path.write_text(_lead_current_state_markdown(packet), encoding="utf-8")
 
-    receipt_path, receipt = _lead_write_receipt(root, packet, command_run="agentmd lead compile")
-    return packet, json_path, md_path, receipt_path, receipt
+    receipt_path, receipt = _lead_write_receipt(root, packet, command_run="yare lead compile")
+    storage_backend.persist_lead_compile(packet=packet, artifacts=artifacts, receipt=receipt)
+    s3_uris = archive_backend.archive_lead_compile(
+        packet=packet,
+        json_path=json_path,
+        md_path=md_path,
+        receipt_path=receipt_path,
+    )
+    return packet, json_path, md_path, receipt_path, receipt, s3_uris
+
+
+@storage_app.command("init")
+def storage_init() -> None:
+    try:
+        storage_backend.init_schema()
+    except storage_backend.StorageError as e:
+        typer.echo(str(e))
+        raise typer.Exit(code=1)
+    typer.echo("storage: initialized")
+    typer.echo(f"tables: {', '.join(storage_backend.SCHEMA_TABLES)}")
 
 
 @lead_app.command("compile")
@@ -1531,13 +1554,13 @@ def lead_compile(
     root = root.resolve()
     artifact_paths = artifact or []
     try:
-        packet, json_path, md_path, receipt_path, receipt = compile_lead_state(
+        packet, json_path, md_path, receipt_path, receipt, s3_uris = compile_lead_state(
             root,
             task_override=task,
             artifact_paths=artifact_paths,
             validate_artifacts=bool(artifact_paths),
         )
-    except ValueError as e:
+    except (ValueError, storage_backend.StorageError, archive_backend.ArchiveError) as e:
         typer.echo(str(e))
         raise typer.Exit(code=1)
 
@@ -1550,6 +1573,8 @@ def lead_compile(
     typer.echo(f"deterministic_hash: {packet['deterministic_hash']}")
     typer.echo(f"receipt: {_display_path(root, receipt_path)}")
     typer.echo(f"receipt_hash: {receipt['receipt_hash']}")
+    for uri in s3_uris:
+        typer.echo(f"s3_uri: {uri}")
 
 
 @skill_app.command("apply-edit")
@@ -1597,7 +1622,7 @@ def doctor(
 def resolve(
     task: str = typer.Option(..., "--task", help="Task to resolve context for"),
     root: Path = typer.Option(Path("."), "--root", help="Workspace root"),
-    output: Path = typer.Option(Path(".agentmd/resolved-context.json"), "--output", help="Resolved context output path"),
+    output: Path = typer.Option(Path(".yare/resolved-context.json"), "--output", help="Resolved context output path"),
     json_output: bool = typer.Option(False, "--json", help="Print resolved context as JSON"),
 ) -> None:
     root = root.resolve()
@@ -1618,7 +1643,7 @@ def receipt(
     adapter: str | None = typer.Option(None, "--adapter", help="Adapter value to record"),
 ) -> None:
     root = root.resolve()
-    out_path, data = write_receipt(root, command_run="agentmd receipt", task=task, adapter=adapter)
+    out_path, data = write_receipt(root, command_run="yare receipt", task=task, adapter=adapter)
     typer.echo(f"receipt: {_relative(root, out_path)}")
     typer.echo(f"receipt_hash: {data['receipt_hash']}")
 
@@ -1635,16 +1660,16 @@ def run(
         raise typer.BadParameter("adapter must be one of: codex, claude, gemini")
 
     resolve_context(root, task)
-    write_receipt(root, command_run=f"agentmd run --adapter {adapter} --task {task}", task=task, adapter=adapter, phase="pre")
+    write_receipt(root, command_run=f"yare run --adapter {adapter} --task {task}", task=task, adapter=adapter, phase="pre")
 
-    context_file = ".agentmd/resolved-context.json"
+    context_file = ".yare/resolved-context.json"
     launch = ADAPTER_INSTRUCTIONS[adapter].format(task=task.replace('"', '\\"'), context_file=context_file)
-    typer.echo("agentmd run v1 does not execute adapters yet.")
+    typer.echo("yare run v1 does not execute adapters yet.")
     typer.echo(f"launch_instruction: {launch}")
 
     out_path, data = write_receipt(
         root,
-        command_run=f"agentmd run --adapter {adapter} --task {task}",
+        command_run=f"yare run --adapter {adapter} --task {task}",
         task=task,
         adapter=adapter,
         phase="post",

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://agentmd.dev/schemas/skill-edit.schema.json",
-  "title": "AgentMD Skill Edit",
-  "description": "Bounded skill edit proposal for AgentMD skill gate.",
+  "$id": "https://yare.dev/schemas/skill-edit.schema.json",
+  "title": "Yare Skill Edit",
+  "description": "Bounded skill edit proposal for Yare skill gate.",
   "type": "object",
   "required": [
     "schema_version",

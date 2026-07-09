@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://agentmd.dev/schemas/lead-artifact.schema.json",
-  "title": "AgentMD Lead Artifact",
-  "description": "Portable input artifact for AgentMD AI Work Lead compile.",
+  "$id": "https://yare.dev/schemas/lead-artifact.schema.json",
+  "title": "Yare Lead Artifact",
+  "description": "Portable input artifact for Yare AI Work Lead compile.",
   "type": "object",
   "required": [
     "schema_version",

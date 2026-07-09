@@ -16,7 +16,7 @@
       "task": "stabilize receipt output",
       "adapter": "codex",
       "files_touched": [
-        "cli/agentmd.py"
+        "cli/yare.py"
       ],
       "claims_made": [
         {
@@ -59,7 +59,7 @@
       "run_id": "demo-run-002",
       "timestamp": "2026-05-26T10:15:00Z",
       "source_artifact": "examples/lead-artifacts/run-claude.json",
-      "task": "verify agentmd results endpoint",
+      "task": "verify yare results endpoint",
       "adapter": "claude",
       "files_touched": [
         "apps/api/src/memory/server.py"
@@ -160,7 +160,7 @@
     "what_changed": [
       "README.md",
       "apps/api/src/memory/server.py",
-      "cli/agentmd.py",
+      "cli/yare.py",
       "examples/lead-artifacts/run-gemini.jsonl"
     ],
     "what_is_true": [
@@ -211,8 +211,8 @@
       "dirty": true,
       "changed_files": [
         "README.md",
-        "cli/agentmd.py",
-        "tests/agentmd/test_agentmd_cli.py"
+        "cli/yare.py",
+        "tests/yare/test_yare_cli.py"
       ],
       "untracked_files": [
         ".sticky/",

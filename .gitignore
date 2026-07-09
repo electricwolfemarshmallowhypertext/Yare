@@ -8,14 +8,18 @@ __pycache__/
 !.env.example
 secrets/
 receipts/*.jsonl
-.agentmd/resolved-context.json
+site.txt
+.yare/
+.yare/resolved-context.json
 node_modules/
 dist/
 build/
 
 data/
+tmp/
+*.tmp
 
-.agentmd/last-resolved-path.txt
+.yare/last-resolved-path.txt
 .sticky/
 !examples/lead-artifacts/
 !examples/lead-artifacts/**

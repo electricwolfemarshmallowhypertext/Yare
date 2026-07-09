@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  agentmd-cli:
+  yare-cli:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -25,9 +25,9 @@ jobs:
       - name: Validate CLI syntax
         shell: pwsh
         run: |
-          python -m py_compile cli/agentmd.py
+          python -m py_compile cli/yare.py
 
-      - name: Run AgentMD CLI tests
+      - name: Run Yare CLI tests
         shell: pwsh
         run: |
-          python -m pytest -q tests/agentmd/test_agentmd_cli.py
+          python -m pytest -q tests/yare/test_yare_cli.py

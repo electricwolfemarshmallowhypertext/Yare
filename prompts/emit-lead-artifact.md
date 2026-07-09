@@ -1,10 +1,10 @@
 # Emit Lead Artifact JSON
 
-Use this prompt in any AI tool (Codex, Claude, Gemini, ChatGPT, Cursor) to emit a valid AgentMD Lead Artifact without a custom adapter.
+Use this prompt in any AI tool (Codex, Claude, Gemini, ChatGPT, Cursor) to emit a valid Yare Lead Artifact without a custom adapter.
 
 ## Copy/Paste Prompt
 
-Output exactly one JSON object that matches AgentMD Lead Artifact schema.
+Output exactly one JSON object that matches Yare Lead Artifact schema.
 
 Rules:
 - Output JSON only. No markdown. No comments.

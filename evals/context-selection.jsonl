@@ -1,2 +1,2 @@
 {"id":"eval-context-drift-001","task":"review this repo for context drift","must_include":["AGENTS.md","policies/context-governance.yaml"],"notes":"Governance baseline should always be selected."}
-{"id":"eval-receipt-001","task":"generate an auditable receipt","must_include":[".agentmd/resolved-context.json"],"notes":"Receipt path must be consumable by downstream tooling."}
+{"id":"eval-receipt-001","task":"generate an auditable receipt","must_include":[".yare/resolved-context.json"],"notes":"Receipt path must be consumable by downstream tooling."}

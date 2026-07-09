@@ -1,122 +1,113 @@
-﻿# AgentMD Runtime
+# Yare
 
-[![CI](https://github.com/electricwolfemarshmallowhypertext/agentmd-runtime/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/electricwolfemarshmallowhypertext/agentmd-runtime/actions/workflows/ci.yml)
-[![AgentMD Lead Demo](https://github.com/electricwolfemarshmallowhypertext/agentmd-runtime/actions/workflows/agentmd-lead-demo.yml/badge.svg?branch=main)](https://github.com/electricwolfemarshmallowhypertext/agentmd-runtime/actions/workflows/agentmd-lead-demo.yml)
-[![Latest Release](https://img.shields.io/github/v/release/electricwolfemarshmallowhypertext/agentmd-runtime?display_name=tag)](https://github.com/electricwolfemarshmallowhypertext/agentmd-runtime/releases)
+**Durable work memory for AI agents.**
 
-**AgentMD compiles scattered AI/tool runs into one verified current-state packet.**
+Yare gives coding agents a clean handoff: what changed, what is true, what is unresolved, what needs human review, and what to do next.
 
-It compiles scattered AI/tool runs into one verified current-state packet, with schema validation, deterministic hashes, and proof receipts.
+It stores that memory in CockroachDB, archives proof artifacts to S3, and lets agent clients inspect the same state through CockroachDB Managed MCP.
 
-![AgentMD Flow](docs/assets/agentmd-flow.png)
+![Yare Flow](docs/assets/yare-flow.png)
+
+## Why Yare Exists
+
+AI coding work gets messy fast.
+
+One agent changes files.
+Another claims tests passed.
+CI says something else.
+A human comes back later and has to reconstruct the truth from chats, logs, diffs, and guesses.
+
+Yare keeps the work state readable.
+
+## What Yare Gives You
+
+- changed files
+- verified facts
+- unverified claims
+- contradictions
+- human approval items
+- open loops
+- proof receipts
+- next clean action
+
+## How It Works
+
+```text
+AI/tool runs
+-> Lead Artifacts
+-> Yare compile
+-> CockroachDB memory
+-> S3 proof archive
+-> agent handoff
+```
+
+CockroachDB is the durable memory store.
+S3 stores proof artifacts.
+Local `.yare` and `.sticky` files remain export/fallback files.
+
+## Real Demo
+
+```powershell
+.\scripts\demo-real-use-case.ps1
+```
+
+The demo compiles prior AI runs, stores the state in CockroachDB, reads it back, and prints a handoff another agent can use.
 
 ## Proof
 
-- Current public release: `v0.3.0-alpha.2`
-- `v0.2.0`: AI Work Lead checkpoint
-- `v0.3.0-alpha.2`: CI-verified alpha with gated skill edit primitive
-- CI: green
-- AgentMD Lead Demo: green
-- AgentMD tests: `20 passed`
-- Deterministic demo script: `scripts/demo-lead-compile.ps1`
-- Lead Artifact schema validation is enforced (`schemas/lead-artifact.schema.json`)
-- Technical proof note: `docs/proof_note.md`
+- CockroachDB memory smoke: `docs/COCKROACH_SMOKE_RESULT.md`
+- Real handoff demo: `docs/REAL_USE_CASE_RESULT.md`
+- S3 archive smoke: `docs/S3_SMOKE_RESULT.md`
+- Claude Code MCP proof: `docs/MCP_SMOKE_RESULT.md`
+- Codex MCP proof: `docs/CODEX_MCP_SMOKE_RESULT.md`
+- Cursor MCP proof: `docs/CURSOR_MCP_SMOKE_RESULT.md`
 
-## Problem
+## Use Cases
 
-AI work is fragmented across chats, CLIs, CI logs, scripts, and partial artifacts. Teams lose truth-state when outputs are stale, contradictory, or unverifiable.
+See `docs/use-cases/`.
 
-AgentMD creates one reproducible trace:
+Start here:
 
-```text
-task
-  → validate context
-  → compile current-state packet
-  → enforce schema gates
-  → write proof receipts
-  → preserve audit trail
-```
-
-## AI Work Lead
-
-`agentmd lead compile` turns scattered run artifacts into one verified operating picture with deterministic hashing and proof receipts.
-
-![Verified Current-State Packet](docs/assets/current-state-packet.png)
-
-The compiled packet includes:
-
-- what changed
-- what is true
-- what is unverified
-- contradictions
-- human approval items
-- next clean action
-
-Runtime outputs:
-
-- `.sticky/current-state.json`
-- `.sticky/current-state.md`
-- `.sticky/receipts/*.jsonl`
-
-## Lead Artifact v1
-
-Lead Artifact is the portable input contract for any tool (Codex, Claude, Gemini, ChatGPT, Cursor, CI jobs, scripts).
-
-- Schema: `schemas/lead-artifact.schema.json`
-- Required version field: `schema_version: "lead-artifact.v1"`
-- Strict validation dependency: `jsonschema`
-- Invalid artifacts fail compile with explicit schema errors
-
-Use the portable emitter prompt and template:
-
-- `prompts/emit-lead-artifact.md`
-- `examples/lead-artifacts/template.lead-artifact.json`
-
-## Skill Edit Gate
-
-AgentMD includes a gated SkillOpt-style primitive for controlled skill evolution without runtime optimizer calls.
-
-- Command: `agentmd skill apply-edit --edit <path>`
-- Input schema: `schemas/skill-edit.schema.json` (`skill-edit.v1`)
-- Bounded edit types only: `add`, `delete`, `replace`
-- Acceptance policy: only apply when `validation_score > baseline_score`
-- Accepted edits: `.sticky/skill-receipts/*.jsonl`
-- Rejected edits: `.sticky/rejected-skill-edits/*.jsonl`
-
-Scope intentionally not implemented yet:
-
-- optimizer model that proposes edits
-- multi-epoch benchmark loop
-- autonomous self-editing runtime
-
-## Core Commands
-
-```powershell
-.\agentmd.cmd doctor
-.\agentmd.cmd resolve --task "review this repo for context drift"
-.\agentmd.cmd receipt
-.\agentmd.cmd run --adapter codex --task "review this repo for context drift"
-.\agentmd.cmd lead compile --task "compile ai work lead state" --artifact examples/lead-artifacts/run-codex.jsonl --artifact examples/lead-artifacts/run-claude.json --artifact examples/lead-artifacts/run-gemini.jsonl
-.\agentmd.cmd skill apply-edit --edit examples/skill-optimization/accepted-edit.json
-```
+- AI coding teams
+- Engineering audit
+- Compliance teams
+- Vibe coders
+- Content and research operators
+- Devtool founders and AI agencies
 
 ## Quickstart
 
 ```bash
-git clone https://github.com/electricwolfemarshmallowhypertext/agentmd-runtime.git
-cd agentmd-runtime
+git clone https://github.com/electricwolfemarshmallowhypertext/Yare.git
+cd Yare
 ```
 
 ```powershell
 python -m pip install -r requirements-cli.txt
-python -m pytest -q tests/agentmd/test_agentmd_cli.py
+python -m cli.yare doctor
 .\scripts\demo-lead-compile.ps1
+```
+
+## CockroachDB
+
+```powershell
+$env:YARE_DATABASE_URL = "postgresql://USER:PASSWORD@HOST:26257/defaultdb?sslmode=verify-full"
+python -m cli.yare storage init
+```
+
+## S3 Archive
+
+```powershell
+$env:YARE_S3_BUCKET = "your-bucket"
+$env:YARE_S3_PREFIX = "yare/"
+```
+
+## Core Command
+
+```powershell
+.\yare.cmd lead compile --task "compile ai work lead state" --artifact examples/lead-artifacts/run-codex.jsonl --artifact examples/lead-artifacts/run-claude.json --artifact examples/lead-artifacts/run-gemini.jsonl
 ```
 
 ## License
 
-AgentMD Runtime is source-available under **BUSL-1.1**.
-
-Commercial production use, hosted service use, resale, embedding into commercial products, or offering substantially similar functionality as a service requires a commercial license from the Licensor.
-
-See `LICENSE`, `LICENSE.md`, and `NOTICE`.
+MIT

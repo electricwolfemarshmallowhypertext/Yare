@@ -1,7 +1,7 @@
 {
   "run_id": "demo-run-002",
   "tool": "claude",
-  "task": "verify agentmd results endpoint",
+  "task": "verify yare results endpoint",
   "timestamp": "2026-05-26T10:15:00Z",
   "claims": [
     {
