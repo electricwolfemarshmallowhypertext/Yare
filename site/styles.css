@@ -4,7 +4,6 @@
   --yellow: #ffe500;
   --amber: #ffad00;
   --lime: #aaff00;
-  --cyan: #00e5ff;
   --dark: #18003a;
   --white: #ffffff;
 }
@@ -139,7 +138,7 @@ p {
   font-size: 50px;
   display: block;
   line-height: 1;
-  color: var(--cyan);
+  color: #000000;
   text-shadow: 3px 3px 0 var(--white);
   animation: gem-pulse 2s ease-in-out infinite;
   transform-origin: center;
