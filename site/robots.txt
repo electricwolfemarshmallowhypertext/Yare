@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://yare-vert.vercel.app/sitemap.xml

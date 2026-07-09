@@ -118,6 +118,72 @@ p {
   color: var(--dark);
 }
 
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+}
+
+.hero-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 13px 18px;
+  background: var(--white);
+  border: 3px solid #000000;
+  box-shadow: 5px 5px 0 #000000;
+  color: #000000;
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.hero-button.primary {
+  background: var(--yellow);
+}
+
+.hero-button:hover,
+.hero-button:focus {
+  background: var(--pink);
+  color: var(--white);
+}
+
+.use-yare-local {
+  position: relative;
+  z-index: 10;
+  padding: 52px 7%;
+  background: var(--white);
+  border-top: 4px solid #000000;
+  border-bottom: 4px solid #000000;
+  color: #000000;
+}
+
+.use-yare-local span {
+  display: block;
+  margin-bottom: 8px;
+  font-family: "Boogaloo", cursive;
+  font-size: clamp(12px, 1.4vw, 15px);
+  letter-spacing: 0.45em;
+  opacity: 0.6;
+}
+
+.use-yare-local h2 {
+  max-width: 900px;
+  font-size: clamp(34px, 6vw, 76px);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.use-yare-local p {
+  max-width: 680px;
+  margin: 14px 0 22px;
+  color: #000000;
+}
+
 .path-section {
   position: relative;
   overflow: visible;
@@ -652,6 +718,16 @@ a:visited {
   margin-top: 10px;
 }
 
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.footer-links a {
+  font-weight: 700;
+}
+
 .footer-logo {
   justify-self: end;
   font-size: clamp(34px, 10vw, 130px);
@@ -668,6 +744,17 @@ a:visited {
   .hero {
     min-height: 360px;
     padding: 44px 5%;
+  }
+
+  .hero-actions {
+    align-items: stretch;
+    flex-direction: column;
+    width: 100%;
+    max-width: 320px;
+  }
+
+  .use-yare-local {
+    padding: 38px 5%;
   }
 
   .mstop:nth-child(even) {
