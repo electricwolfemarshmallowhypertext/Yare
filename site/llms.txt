@@ -1,0 +1,39 @@
+# Yare
+
+Yare is durable work memory for AI agents.
+
+It gives agents and humans a clean handoff: what changed, what is true, what is unresolved, what needs human review, proof receipts, and the next clean action.
+
+## Primary links
+
+- Site: https://yare-vert.vercel.app/
+- Use cases: https://yare-vert.vercel.app/use-cases.html
+- GitHub: https://github.com/electricwolfemarshmallowhypertext/Yare
+- License: https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/LICENSE
+
+## Proof
+
+- CockroachDB memory smoke: https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/COCKROACH_SMOKE_RESULT.md
+- Real handoff demo: https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/REAL_USE_CASE_RESULT.md
+- S3 archive smoke: https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/S3_SMOKE_RESULT.md
+- Claude Code MCP proof: https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/MCP_SMOKE_RESULT.md
+- Codex MCP proof: https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/CODEX_MCP_SMOKE_RESULT.md
+- Cursor MCP proof: https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/CURSOR_MCP_SMOKE_RESULT.md
+
+## Use cases
+
+- AI coding teams
+- Engineering audit
+- Compliance teams
+- Vibe coders
+- Content and research operators
+- Devtool founders and AI agencies
+- Technical docs teams
+- Product teams writing specs with AI
+- Support and customer ops teams using agents
+- Long-form writers using AI
+
+## Contact
+
+T. Smith / Antiparty Inc.
+smith@antiparty.co
