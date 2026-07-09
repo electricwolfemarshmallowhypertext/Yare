@@ -1,3 +1,43 @@
+function copyUseCaseText(text, button) {
+  const done = () => {
+    const original = button.getAttribute("aria-label");
+    button.setAttribute("aria-label", "Copied");
+    setTimeout(() => button.setAttribute("aria-label", original), 1200);
+  };
+
+  const fallback = () => {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.left = "-9999px";
+    document.body.appendChild(area);
+    area.select();
+    document.execCommand("copy");
+    area.remove();
+    done();
+  };
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(done).catch(fallback);
+    return;
+  }
+
+  fallback();
+}
+
+document.querySelectorAll("[data-copy-card]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const card = button.closest(".use-case-card");
+    const title = card.querySelector("h2").textContent.trim();
+    const description = card
+      .querySelector(".use-case-description")
+      .textContent.trim();
+    copyUseCaseText(`${title}\n\n${description}`, button);
+  });
+});
+
+if (window.gsap && window.ScrollTrigger && window.MotionPathPlugin) {
 gsap.registerPlugin(ScrollTrigger, MotionPathPlugin);
 
 let mpCtx;
@@ -83,7 +123,7 @@ function drawTrace(boxRect, stops) {
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
   path.setAttribute("d", d);
   path.setAttribute("fill", "none");
-  path.setAttribute("stroke", "rgba(24,0,58,0.15)");
+  path.setAttribute("stroke", "rgba(0,0,0,0.15)");
   path.setAttribute("stroke-width", "2");
   path.setAttribute("stroke-dasharray", "8 6");
   svg.innerHTML = "";
@@ -138,4 +178,5 @@ if (isTouchDevice()) {
       el.classList.toggle("tapped");
     });
   });
+}
 }
