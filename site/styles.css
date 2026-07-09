@@ -4,6 +4,7 @@
   --yellow: #ffe500;
   --amber: #ffad00;
   --lime: #aaff00;
+  --cyan: #00e5ff;
   --dark: #18003a;
   --white: #ffffff;
 }
@@ -138,7 +139,8 @@ p {
   font-size: 50px;
   display: block;
   line-height: 1;
-  filter: drop-shadow(0 0 8px var(--pink)) drop-shadow(0 0 20px var(--yellow));
+  color: var(--cyan);
+  text-shadow: 3px 3px 0 var(--white);
   animation: gem-pulse 2s ease-in-out infinite;
   transform-origin: center;
 }
