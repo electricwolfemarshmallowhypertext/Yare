@@ -102,6 +102,7 @@ p {
 .hero h1 {
   max-width: min(1500px, 94vw);
   font-size: clamp(28px, 4.5vw, 72px);
+  font-weight: 400;
   line-height: 1;
   color: #000000;
 }
