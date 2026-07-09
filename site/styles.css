@@ -94,7 +94,7 @@ p {
   align-items: center;
   justify-content: center;
   gap: 20px;
-  padding: 120px 7%;
+  padding: 120px 7% 70px;
   background: transparent;
   text-align: center;
 }
