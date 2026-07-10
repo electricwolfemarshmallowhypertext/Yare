@@ -43,14 +43,14 @@ document.querySelectorAll("[data-copy-card]").forEach((button) => {
   button.addEventListener("click", () => {
     const card = button.closest(".use-case-card");
     const downloadLink = card.querySelector("a[download]");
-    const fileName = downloadLink.getAttribute("href").split("/").pop();
+    const fileName = downloadLink.dataset.file || downloadLink.getAttribute("href").split("/").pop();
     copyUseCaseText(window.USE_CASE_MARKDOWN[fileName], button);
   });
 });
 
 document.querySelectorAll(".use-case-actions a[download]").forEach((link) => {
   link.addEventListener("click", (event) => {
-    const fileName = link.getAttribute("href").split("/").pop();
+    const fileName = link.dataset.file || link.getAttribute("href").split("/").pop();
     const markdown = window.USE_CASE_MARKDOWN[fileName];
     if (!markdown) return;
 
