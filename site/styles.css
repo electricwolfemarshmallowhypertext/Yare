@@ -162,6 +162,10 @@ p {
   background: #ff0099;
 }
 
+.hero-button.repo-button {
+  background: #ffffff;
+}
+
 .hero-button.proof-demo {
   align-self: flex-start;
   margin-top: 30px;
@@ -173,6 +177,12 @@ p {
 .hero-button:focus {
   background: var(--pink);
   color: var(--white);
+}
+
+.hero-button.proof-demo:hover,
+.hero-button.proof-demo:focus {
+  background: #aaff00;
+  color: #000000;
 }
 
 .use-yare-local {
@@ -206,10 +216,6 @@ p {
   margin: 14px 0 22px;
   color: #000000;
   text-wrap: pretty;
-}
-
-.keep-together {
-  white-space: nowrap;
 }
 
 .path-section {
