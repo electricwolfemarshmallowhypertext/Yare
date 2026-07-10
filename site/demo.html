@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Yare Demo Viewer</title>
-  <meta name="description" content="A static Yare demo viewer for a sample current-state handoff.">
+  <meta name="description" content="A live read-only Yare demo that loads the latest handoff from CockroachDB memory.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Boogaloo&family=Inter:wght@300;400;700&family=Rubik+Mono+One&display=swap" rel="stylesheet">
@@ -17,24 +17,25 @@
     }
 
     .demo-hero {
-      max-width: 1200px;
+      max-width: 1180px;
       margin-bottom: 34px;
     }
 
-    .demo-hero span {
+    .demo-hero span,
+    .meta-label {
       display: block;
       margin-bottom: 12px;
       font-family: "Boogaloo", cursive;
       font-size: clamp(12px, 1.4vw, 15px);
       letter-spacing: 0.45em;
-      opacity: 0.6;
+      opacity: 0.68;
     }
 
     .demo-hero h1 {
-      max-width: 1100px;
-      font-size: clamp(36px, 7vw, 96px);
+      max-width: 1120px;
+      font-size: clamp(38px, 7vw, 94px);
       font-weight: 400;
-      line-height: 1;
+      line-height: 0.98;
       color: #000000;
     }
 
@@ -65,31 +66,34 @@
 
     .demo-layout {
       display: grid;
-      grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr);
+      grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
       gap: 28px;
       align-items: start;
     }
 
     .demo-panel,
-    .handoff-preview {
+    .handoff-preview,
+    .meta-panel {
       background: var(--white);
       border: 3px solid #000000;
       box-shadow: 10px 10px 0 #000000;
       color: #000000;
     }
 
-    .demo-panel {
-      padding: 28px;
+    .demo-panel,
+    .handoff-preview,
+    .meta-panel {
+      padding: 26px;
     }
 
     .handoff-preview {
       position: sticky;
       top: 86px;
-      padding: 24px;
     }
 
     .handoff-preview h2,
-    .demo-panel h2 {
+    .demo-panel h2,
+    .meta-panel h2 {
       font-size: clamp(22px, 3vw, 38px);
       font-weight: 400;
       line-height: 1;
@@ -121,7 +125,8 @@
       line-height: 1;
     }
 
-    .demo-section ul {
+    .demo-section ul,
+    .meta-list {
       display: grid;
       gap: 8px;
       padding-left: 20px;
@@ -130,7 +135,8 @@
       line-height: 1.45;
     }
 
-    .demo-section li::marker {
+    .demo-section li::marker,
+    .meta-list li::marker {
       color: var(--pink);
     }
 
@@ -140,118 +146,38 @@
       line-height: 1.5;
     }
 
-    .demo-note {
-      max-width: 720px;
-      margin-top: 18px;
-      font-family: "Inter", sans-serif;
-      font-size: 13px;
-      line-height: 1.45;
-      opacity: 0.75;
-    }
-
-    .timeline-demo {
-      margin-top: 58px;
-      background: var(--white);
-      border: 3px solid #000000;
-      box-shadow: 10px 10px 0 #000000;
-      color: #000000;
-      padding: 28px;
-    }
-
-    .timeline-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 24px;
-      align-items: flex-start;
+    .meta-panel {
       margin-bottom: 28px;
     }
 
-    .timeline-head h2 {
-      max-width: 760px;
-      font-size: clamp(28px, 5vw, 68px);
-      font-weight: 400;
-      line-height: 0.96;
-    }
-
-    .timeline-head p {
-      max-width: 520px;
-      margin-top: 12px;
-      font-size: clamp(15px, 1.5vw, 18px);
-      line-height: 1.45;
-    }
-
-    .timeline-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-      justify-content: flex-end;
-    }
-
-    .timeline-track {
+    .meta-grid {
       display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      gap: 22px;
-      align-items: stretch;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 18px;
+      font-family: "Inter", sans-serif;
     }
 
-    .timeline-state {
+    .meta-item {
       border: 2px solid #000000;
-      padding: 20px;
-      background: #ffe500;
+      padding: 12px;
+      min-width: 0;
     }
 
-    .timeline-state.latest {
-      background: var(--white);
-      box-shadow: 7px 7px 0 #000000;
-    }
-
-    .timeline-state span {
+    .meta-item span {
       display: block;
-      margin-bottom: 10px;
-      font-family: "Boogaloo", cursive;
+      margin-bottom: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .meta-item code {
+      display: block;
+      overflow-wrap: anywhere;
+      font-family: "Inter", sans-serif;
       font-size: 13px;
-      letter-spacing: 0.32em;
-    }
-
-    .timeline-state h3 {
-      font-size: clamp(24px, 3.2vw, 42px);
-      font-weight: 400;
-      line-height: 0.95;
-      margin-bottom: 12px;
-    }
-
-    .timeline-state p,
-    .timeline-state li,
-    .timeline-diff li {
-      font-size: clamp(14px, 1.3vw, 16px);
-      line-height: 1.45;
-    }
-
-    .timeline-state ul,
-    .timeline-diff ul {
-      display: grid;
-      gap: 8px;
-      padding-left: 18px;
-    }
-
-    .timeline-arrow {
-      display: grid;
-      place-items: center;
-      font-family: "Rubik Mono One", sans-serif;
-      font-size: clamp(28px, 4vw, 54px);
-    }
-
-    .timeline-diff {
-      margin-top: 26px;
-      border-top: 2px solid #000000;
-      padding-top: 24px;
-    }
-
-    .timeline-diff h3 {
-      margin-bottom: 12px;
-      font-size: clamp(24px, 3vw, 40px);
-      font-weight: 400;
-      line-height: 0.95;
+      line-height: 1.35;
     }
 
     @media (max-width: 860px) {
@@ -259,29 +185,13 @@
         padding: 48px 5% 70px;
       }
 
-      .demo-layout {
+      .demo-layout,
+      .meta-grid {
         grid-template-columns: 1fr;
       }
 
       .handoff-preview {
         position: static;
-      }
-
-      .timeline-head,
-      .timeline-track {
-        grid-template-columns: 1fr;
-      }
-
-      .timeline-head {
-        display: grid;
-      }
-
-      .timeline-actions {
-        justify-content: flex-start;
-      }
-
-      .timeline-arrow {
-        transform: rotate(90deg);
       }
     }
 
@@ -292,18 +202,10 @@
       }
 
       .demo-panel,
-      .handoff-preview {
+      .handoff-preview,
+      .meta-panel {
         padding: 22px;
         box-shadow: 7px 7px 0 #000000;
-      }
-
-      .timeline-demo {
-        padding: 22px;
-        box-shadow: 7px 7px 0 #000000;
-      }
-
-      .timeline-actions {
-        flex-direction: column;
       }
     }
   </style>
@@ -314,6 +216,7 @@
     <div class="nav-center">
       <a href="home/#proof">Proof</a>
       <a href="use-cases/">Use Cases</a>
+      <a href="/demo">Demo</a>
       <a href="https://github.com/electricwolfemarshmallowhypertext/Yare">GitHub</a>
       <a href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/LICENSE">License</a>
     </div>
@@ -322,79 +225,51 @@
 
   <main class="demo-page">
     <header class="demo-hero">
-      <span>STATIC DEMO</span>
+      <span>LIVE DEMO</span>
       <h1>Yare Demo Viewer</h1>
-      <p>Load a sample current-state handoff and inspect what changed, what is true, what is unresolved, contradictions, and the next clean action.</p>
-      <p class="demo-note">This is a static sample viewer. It does not connect to CockroachDB, S3, MCP, or any live backend.</p>
+      <p>Click once to load the latest Yare handoff from live CockroachDB memory.</p>
+      <p>This demo is read-only. It does not write to the database, upload files, expose credentials, or require login.</p>
     </header>
 
     <div class="demo-actions" aria-label="Demo actions">
-      <button class="hero-button primary" type="button" id="loadSample">Load sample handoff</button>
-      <button class="hero-button" type="button" id="copyHandoff" disabled>Copy the handoff</button>
-      <button class="hero-button" type="button" id="downloadJson" disabled>Download sample current-state JSON</button>
-      <span class="demo-status" id="demoStatus">No sample loaded</span>
+      <button class="hero-button primary" type="button" id="loadHandoff">Load latest live handoff</button>
+      <button class="hero-button" type="button" id="copyHandoff" disabled>Copy handoff</button>
+      <button class="hero-button" type="button" id="downloadJson" disabled>Download JSON</button>
+      <span class="demo-status" id="demoStatus">Waiting for live handoff</span>
     </div>
 
-    <section class="demo-layout" aria-label="Sample handoff viewer">
+    <section class="meta-panel" aria-label="Live handoff metadata">
+      <span class="meta-label">LIVE COCKROACHDB MEMORY</span>
+      <h2 id="handoffTask">No handoff loaded.</h2>
+      <div class="meta-grid">
+        <div class="meta-item">
+          <span>run_id</span>
+          <code id="runId">none</code>
+        </div>
+        <div class="meta-item">
+          <span>created_at</span>
+          <code id="createdAt">none</code>
+        </div>
+        <div class="meta-item">
+          <span>current_state_hash</span>
+          <code id="currentStateHash">none</code>
+        </div>
+        <div class="meta-item">
+          <span>receipt_hash</span>
+          <code id="receiptHash">none</code>
+        </div>
+      </div>
+    </section>
+
+    <section class="demo-layout" aria-label="Live handoff viewer">
       <div class="demo-panel" id="handoffSections">
-        <p class="demo-empty">Load the sample handoff to see the verified working-memory packet.</p>
+        <p class="demo-empty">Load the latest handoff to see what changed, what is true, what is unresolved, contradictions, human approval items, open loops, and the next clean action.</p>
       </div>
 
       <aside class="handoff-preview">
         <h2>Plain handoff</h2>
         <pre id="handoffText">No handoff loaded.</pre>
       </aside>
-    </section>
-
-    <section class="timeline-demo" aria-label="Memory timeline demo">
-      <div class="timeline-head">
-        <div>
-          <span>MEMORY TIMELINE</span>
-          <h2>See agent truth change over time.</h2>
-          <p>Yare compares stored current-state handoffs so the next agent can see what became true, what stayed unresolved, and what needs review.</p>
-        </div>
-        <div class="timeline-actions">
-          <button class="hero-button" type="button" id="copyTimeline">Copy timeline summary</button>
-          <button class="hero-button primary" type="button" id="exportTimeline">Export timeline JSON</button>
-        </div>
-      </div>
-
-      <div class="timeline-track">
-        <article class="timeline-state">
-          <span>PREVIOUS STATE</span>
-          <h3>state-prev-001</h3>
-          <ul>
-            <li>verified facts: 2</li>
-            <li>unresolved claims: 2</li>
-            <li>contradictions: 1</li>
-            <li>human approval items: 2</li>
-          </ul>
-        </article>
-
-        <div class="timeline-arrow" aria-hidden="true">-&gt;</div>
-
-        <article class="timeline-state latest">
-          <span>LATEST STATE</span>
-          <h3>state-latest-002</h3>
-          <ul>
-            <li>verified facts: 3</li>
-            <li>unresolved claims: 1</li>
-            <li>contradictions: 0</li>
-            <li>human approval items: 1</li>
-          </ul>
-        </article>
-      </div>
-
-      <div class="timeline-diff">
-        <h3>What changed in memory</h3>
-        <ul>
-          <li>New truth: S3 archive smoke passed.</li>
-          <li>Resolved claim: real Cockroach smoke was unverified.</li>
-          <li>Cleared contradiction: receipt dirty status.</li>
-          <li>Still unresolved: endpoint smoke test coverage.</li>
-          <li>Next clean action changed from verifying claims to adding endpoint smoke coverage.</li>
-        </ul>
-      </div>
     </section>
   </main>
 
@@ -410,203 +285,89 @@
   </footer>
 
   <script>
-    const sampleCurrentState = {
-      version: "0.2",
-      primitive: "ai_work_lead",
-      task: "compile ai work lead state",
-      artifacts_ingested: 3,
-      artifact_sources: [
-        "examples/lead-artifacts/run-claude.json",
-        "examples/lead-artifacts/run-codex.jsonl:1",
-        "examples/lead-artifacts/run-gemini.jsonl:1"
-      ],
-      current_state: {
-        what_changed: [
-          "README.md",
-          "apps/api/src/memory/server.py",
-          "cli/yare.py",
-          "examples/lead-artifacts/run-gemini.jsonl"
-        ],
-        what_is_true: [
-          "Endpoint returns latest receipt",
-          "README includes AI Work Lead section",
-          "Receipt includes git dirty status"
-        ],
-        what_is_unverified: [
-          "All receipt tests passed in CI"
-        ],
-        what_contradicts_prior_state: [
-          "Receipt includes git dirty status"
-        ],
-        what_needs_human_approval: [
-          "Approve endpoint release gate exception",
-          "Hold release until endpoint smoke test exists",
-          "Resolve contradiction: Receipt includes git dirty status"
-        ],
-        open_loops: [
-          { text: "Add integration coverage for lead compile", status: "open" },
-          { text: "Confirm rollback procedure with ops", status: "open" },
-          { text: "Validate demo command on fresh clone", status: "open" }
-        ],
-        next_clean_action: "Resolve human-approval items before the next run."
-      },
-      proof: {
-        run_id: "demo-run-003",
-        timestamp: "2026-05-26T10:30:00Z",
-        context_bundle_hash: "demo-bundle-003",
-        receipt_hash: "demo-receipt-003",
-        source_artifacts: [
-          "examples/lead-artifacts/run-claude.json",
-          "examples/lead-artifacts/run-codex.jsonl:1",
-          "examples/lead-artifacts/run-gemini.jsonl:1"
-        ]
-      },
-      validation: {
-        ok: true,
-        errors: [],
-        warnings: []
-      },
-      deterministic_hash: "a9ccb7bd56bcf357aaf852683387eb72bc8b7f2f78b374ac55ad8680114282c4"
-    };
-
-    const sampleMemoryTimeline = {
-      states: [
-        {
-          state_hash: "state-prev-001",
-          created_at: "2026-07-09T12:32:05Z",
-          task: "compile ai work lead state",
-          run_id: "demo-run-002",
-          receipt_hash: "receipt-prev-001",
-          changed_files_count: 4,
-          verified_facts_count: 2,
-          unresolved_claims_count: 2,
-          contradictions_count: 1,
-          human_approval_count: 2,
-          next_clean_action: "Verify unverified claims."
-        },
-        {
-          state_hash: "state-latest-002",
-          created_at: "2026-07-09T13:20:50Z",
-          task: "compile ai work lead state",
-          run_id: "demo-run-003",
-          receipt_hash: "62373551749a4ba1c26a0ad7c2b7903f3d71653c5478db10816f6a4214419f4e",
-          changed_files_count: 4,
-          verified_facts_count: 3,
-          unresolved_claims_count: 1,
-          contradictions_count: 0,
-          human_approval_count: 1,
-          next_clean_action: "Add endpoint smoke test coverage."
-        }
-      ],
-      diff: {
-        previous_state_hash: "state-prev-001",
-        latest_state_hash: "state-latest-002",
-        new_truths: ["S3 archive smoke passed"],
-        removed_truths: [],
-        still_unresolved: ["Endpoint smoke test coverage"],
-        new_unresolved_claims: [],
-        resolved_claims: ["Real Cockroach smoke was unverified"],
-        new_contradictions: [],
-        cleared_contradictions: ["Receipt dirty status"],
-        new_approval_items: [],
-        next_clean_action_changed: "Verify unverified claims. -> Add endpoint smoke test coverage."
-      }
-    };
-
     const sectionMap = [
       ["What changed", "what_changed"],
       ["What is true", "what_is_true"],
       ["What is unresolved", "what_is_unverified"],
-      ["Contradictions", "what_contradicts_prior_state"],
-      ["Human approval items", "what_needs_human_approval"],
+      ["Contradictions", "contradictions"],
+      ["Human approval items", "human_approval_items"],
       ["Open loops", "open_loops"]
     ];
 
-    const loadButton = document.getElementById("loadSample");
+    const loadButton = document.getElementById("loadHandoff");
     const copyButton = document.getElementById("copyHandoff");
     const downloadButton = document.getElementById("downloadJson");
     const statusEl = document.getElementById("demoStatus");
     const sectionsEl = document.getElementById("handoffSections");
     const handoffTextEl = document.getElementById("handoffText");
-    const copyTimelineButton = document.getElementById("copyTimeline");
-    const exportTimelineButton = document.getElementById("exportTimeline");
+    const handoffTaskEl = document.getElementById("handoffTask");
+    const runIdEl = document.getElementById("runId");
+    const createdAtEl = document.getElementById("createdAt");
+    const currentStateHashEl = document.getElementById("currentStateHash");
+    const receiptHashEl = document.getElementById("receiptHash");
+
+    let latestHandoff = null;
+
+    function asArray(value) {
+      return Array.isArray(value) ? value : [];
+    }
 
     function listItem(value) {
       if (typeof value === "string") return value;
-      return `${value.text} (${value.status})`;
+      if (value && typeof value === "object") {
+        const text = value.text || JSON.stringify(value);
+        return value.status ? `${text} (${value.status})` : text;
+      }
+      return String(value);
     }
 
-    function renderSections() {
-      const state = sampleCurrentState.current_state;
+    function setText(idEl, value) {
+      idEl.textContent = value || "none";
+    }
+
+    function renderSections(data) {
       sectionsEl.innerHTML = sectionMap
         .map(([title, key]) => {
-          const items = state[key] || [];
-          const list = items.map((item) => `<li>${listItem(item)}</li>`).join("");
+          const items = asArray(data[key]);
+          const list = items.length
+            ? items.map((item) => `<li>${listItem(item)}</li>`).join("")
+            : "<li>none</li>";
           return `<section class="demo-section"><h3>${title}</h3><ul>${list}</ul></section>`;
         })
         .join("");
 
       sectionsEl.insertAdjacentHTML(
         "beforeend",
-        `<section class="demo-section"><h3>Next clean action</h3><ul><li>${state.next_clean_action}</li></ul></section>`
+        `<section class="demo-section"><h3>Next clean action</h3><ul><li>${data.next_clean_action || "none"}</li></ul></section>`
       );
     }
 
-    function buildHandoffText() {
-      const state = sampleCurrentState.current_state;
-      return [
-        "Yare sample handoff",
+    function buildHandoffText(data) {
+      const lines = [
+        "Yare live handoff",
         "",
-        `Task: ${sampleCurrentState.task}`,
-        `Deterministic hash: ${sampleCurrentState.deterministic_hash}`,
-        "",
-        "What changed:",
-        ...state.what_changed.map((item) => `- ${item}`),
-        "",
-        "What is true:",
-        ...state.what_is_true.map((item) => `- ${item}`),
-        "",
-        "What is unresolved:",
-        ...state.what_is_unverified.map((item) => `- ${item}`),
-        "",
-        "Contradictions:",
-        ...state.what_contradicts_prior_state.map((item) => `- ${item}`),
-        "",
-        "Human approval items:",
-        ...state.what_needs_human_approval.map((item) => `- ${item}`),
-        "",
-        "Open loops:",
-        ...state.open_loops.map((item) => `- ${listItem(item)}`),
-        "",
-        "Next clean action:",
-        `- ${state.next_clean_action}`
-      ].join("\n");
-    }
+        `Task: ${data.task || "none"}`,
+        `Run ID: ${data.run_id || "none"}`,
+        `Created: ${data.created_at || "none"}`,
+        `Current state hash: ${data.current_state_hash || "none"}`,
+        `Receipt hash: ${data.receipt_hash || "none"}`,
+        ""
+      ];
 
-    function buildTimelineSummary() {
-      const previous = sampleMemoryTimeline.states[0];
-      const latest = sampleMemoryTimeline.states[1];
-      const diff = sampleMemoryTimeline.diff;
-      return [
-        "Yare memory timeline",
-        "",
-        `Previous state: ${previous.state_hash}`,
-        `Latest state: ${latest.state_hash}`,
-        "",
-        "New truths:",
-        ...diff.new_truths.map((item) => `- ${item}`),
-        "",
-        "Still unresolved:",
-        ...diff.still_unresolved.map((item) => `- ${item}`),
-        "",
-        "Resolved claims:",
-        ...diff.resolved_claims.map((item) => `- ${item}`),
-        "",
-        "Cleared contradictions:",
-        ...diff.cleared_contradictions.map((item) => `- ${item}`),
-        "",
-        `Next clean action: ${diff.next_clean_action_changed}`
-      ].join("\n");
+      sectionMap.forEach(([title, key]) => {
+        const items = asArray(data[key]);
+        lines.push(`${title}:`);
+        if (items.length) {
+          lines.push(...items.map((item) => `- ${listItem(item)}`));
+        } else {
+          lines.push("- none");
+        }
+        lines.push("");
+      });
+
+      lines.push("Next clean action:");
+      lines.push(`- ${data.next_clean_action || "none"}`);
+      return lines.join("\n");
     }
 
     function copyText(text) {
@@ -640,13 +401,37 @@
       URL.revokeObjectURL(url);
     }
 
-    loadButton.addEventListener("click", () => {
-      renderSections();
-      handoffTextEl.textContent = buildHandoffText();
-      copyButton.disabled = false;
-      downloadButton.disabled = false;
-      statusEl.textContent = "Sample handoff loaded";
-    });
+    async function loadLatestHandoff() {
+      statusEl.textContent = "Loading live CockroachDB memory...";
+      loadButton.disabled = true;
+
+      try {
+        const response = await fetch("/api/latest-handoff");
+        if (!response.ok) {
+          const message = await response.text();
+          throw new Error(message || `Request failed with ${response.status}`);
+        }
+
+        latestHandoff = await response.json();
+        setText(handoffTaskEl, latestHandoff.task);
+        setText(runIdEl, latestHandoff.run_id);
+        setText(createdAtEl, latestHandoff.created_at);
+        setText(currentStateHashEl, latestHandoff.current_state_hash);
+        setText(receiptHashEl, latestHandoff.receipt_hash);
+        renderSections(latestHandoff);
+        handoffTextEl.textContent = buildHandoffText(latestHandoff);
+        copyButton.disabled = false;
+        downloadButton.disabled = false;
+        statusEl.textContent = "Loaded from live CockroachDB memory";
+      } catch (error) {
+        statusEl.textContent = `Live handoff failed: ${error.message}`;
+        handoffTextEl.textContent = error.message;
+      } finally {
+        loadButton.disabled = false;
+      }
+    }
+
+    loadButton.addEventListener("click", loadLatestHandoff);
 
     copyButton.addEventListener("click", () => {
       copyText(handoffTextEl.textContent).then(() => {
@@ -655,19 +440,9 @@
     });
 
     downloadButton.addEventListener("click", () => {
-      downloadJson(sampleCurrentState, "sample-current-state.json");
-      statusEl.textContent = "Sample JSON downloaded";
-    });
-
-    copyTimelineButton.addEventListener("click", () => {
-      copyText(buildTimelineSummary()).then(() => {
-        statusEl.textContent = "Timeline summary copied";
-      });
-    });
-
-    exportTimelineButton.addEventListener("click", () => {
-      downloadJson(sampleMemoryTimeline, "sample-memory-timeline.json");
-      statusEl.textContent = "Timeline JSON exported";
+      if (!latestHandoff) return;
+      downloadJson(latestHandoff, "latest-yare-handoff.json");
+      statusEl.textContent = "JSON downloaded";
     });
   </script>
 </body>
