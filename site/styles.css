@@ -147,6 +147,10 @@ p {
   background: var(--yellow);
 }
 
+.hero-button.pink {
+  background: var(--pink);
+}
+
 .hero-button:hover,
 .hero-button:focus {
   background: var(--pink);
@@ -157,7 +161,7 @@ p {
   position: relative;
   z-index: 10;
   padding: 52px 7%;
-  background: var(--white);
+  background: var(--lime);
   border-top: 4px solid #000000;
   border-bottom: 4px solid #000000;
   color: #000000;
@@ -183,6 +187,7 @@ p {
   max-width: 680px;
   margin: 14px 0 22px;
   color: #000000;
+  text-wrap: pretty;
 }
 
 .path-section {
