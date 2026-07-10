@@ -74,6 +74,15 @@ body {
   font-weight: 300;
 }
 
+.nav-center a {
+  font-weight: 300;
+}
+
+.nav-center a:hover,
+.nav-center a:focus {
+  font-weight: 600;
+}
+
 .nav-contact {
   justify-self: end;
   font-weight: 700;
@@ -148,7 +157,14 @@ p {
 }
 
 .hero-button.pink {
+  background: #ff0099;
+}
+
+.hero-button.proof-demo {
+  align-self: flex-start;
+  margin-top: 4px;
   background: var(--pink);
+  color: var(--white);
 }
 
 .hero-button:hover,
@@ -161,7 +177,7 @@ p {
   position: relative;
   z-index: 10;
   padding: 52px 7%;
-  background: var(--lime);
+  background: #aaff00;
   border-top: 4px solid #000000;
   border-bottom: 4px solid #000000;
   color: #000000;
@@ -184,10 +200,14 @@ p {
 }
 
 .use-yare-local p {
-  max-width: 680px;
+  max-width: 900px;
   margin: 14px 0 22px;
   color: #000000;
   text-wrap: pretty;
+}
+
+.keep-together {
+  white-space: nowrap;
 }
 
 .path-section {
@@ -332,6 +352,13 @@ p {
   letter-spacing: 0.5em;
   color: var(--dark);
   opacity: 0.55;
+}
+
+.roach-logo {
+  display: block;
+  width: 50px;
+  height: 50px;
+  margin-bottom: 14px;
 }
 
 .roach-proof p {
@@ -715,6 +742,10 @@ a:visited {
   padding: 56px 7% 48px;
 }
 
+.demo-footer {
+  background: #aaff00;
+}
+
 .site-footer p {
   font-size: 12px;
   line-height: 1.4em;
@@ -871,6 +902,14 @@ a:visited {
     right: 22px;
   }
 
+  .use-cases-hero h1 {
+    font-size: clamp(40px, 13vw, 58px);
+  }
+
+  .use-cases-hero h1 span {
+    white-space: normal;
+  }
+
   .outro p {
     font-size: 11px;
     letter-spacing: 0.15em;
@@ -878,6 +917,14 @@ a:visited {
 }
 
 @media (min-width: 641px) and (max-width: 1024px) {
+  .use-cases-hero h1 {
+    font-size: clamp(58px, 9vw, 76px);
+  }
+
+  .use-cases-hero h1 span {
+    white-space: normal;
+  }
+
   .mstop {
     min-height: 60vh;
   }
