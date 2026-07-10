@@ -76,10 +76,12 @@ body {
 
 .nav-center a {
   font-weight: 300;
+  transition: font-weight 120ms ease;
 }
 
 .nav-center a:hover,
-.nav-center a:focus {
+.nav-center a:focus,
+.nav-center a:focus-visible {
   font-weight: 600;
 }
 
@@ -162,9 +164,9 @@ p {
 
 .hero-button.proof-demo {
   align-self: flex-start;
-  margin-top: 4px;
-  background: var(--pink);
-  color: var(--white);
+  margin-top: 30px;
+  background: #aaff00;
+  color: #000000;
 }
 
 .hero-button:hover,
