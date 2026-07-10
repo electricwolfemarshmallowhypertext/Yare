@@ -6,8 +6,6 @@ Yare gives coding agents a clean handoff: what changed, what is true, what is un
 
 It stores that memory in CockroachDB, archives proof artifacts to S3, and lets agent clients inspect the same state through CockroachDB Managed MCP.
 
-![Yare Flow](docs/assets/yare-flow.png)
-
 ## Why Yare Exists
 
 AI coding work gets messy fast.
