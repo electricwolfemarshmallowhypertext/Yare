@@ -120,7 +120,7 @@
       ],
       "claims_made": [
         {
-          "text": "README includes AI Work Lead section",
+          "text": "README includes Yare handoff section",
           "verification_status": "verified"
         }
       ],
@@ -165,7 +165,7 @@
     ],
     "what_is_true": [
       "Endpoint returns latest receipt",
-      "README includes AI Work Lead section",
+      "README includes Yare handoff section",
       "Receipt includes git dirty status"
     ],
     "what_is_unverified": [

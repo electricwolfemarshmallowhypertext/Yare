@@ -17,7 +17,7 @@ from cli import archive as archive_backend
 from cli import storage as storage_backend
 
 app = typer.Typer(add_completion=False, help="Yare context governance runtime CLI")
-lead_app = typer.Typer(add_completion=False, help="AI Work Lead primitives")
+lead_app = typer.Typer(add_completion=False, help="Yare handoff primitives")
 skill_app = typer.Typer(add_completion=False, help="Skill optimization gates")
 storage_app = typer.Typer(add_completion=False, help="CockroachDB durable memory storage")
 memory_app = typer.Typer(add_completion=False, help="Search CockroachDB-backed Yare memory")
@@ -1397,7 +1397,7 @@ def _lead_current_state_markdown(packet: dict[str, Any]) -> str:
         return out
 
     md: list[str] = [
-        "# Sticky Current State",
+        "# Yare Current State",
         "",
         f"Task: {packet.get('task')}",
         f"Deterministic Hash: {packet.get('deterministic_hash')}",

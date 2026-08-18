@@ -58,7 +58,7 @@ Current State Hash: <hash>
 
 ## What Is True
 - Endpoint returns latest receipt
-- README includes AI Work Lead section
+- README includes Yare handoff section
 
 ## What Is Unverified
 - All receipt tests passed in CI

@@ -20,7 +20,7 @@ def fail(msg: str):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Sticky config sanity check")
+    ap = argparse.ArgumentParser(description="Yare config sanity check")
     ap.add_argument("--strict", action="store_true", help="Fail on warnings")
     args = ap.parse_args()
 
