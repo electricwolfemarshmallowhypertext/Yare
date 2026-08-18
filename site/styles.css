@@ -708,6 +708,149 @@ p {
   color: var(--pink);
 }
 
+.proof-page {
+  position: relative;
+  z-index: 10;
+  padding: 86px 7% 96px;
+}
+
+.proof-hero,
+.proof-intro,
+.proof-table-wrap,
+.proof-reproduce {
+  max-width: 1180px;
+}
+
+.proof-hero {
+  margin-bottom: 34px;
+}
+
+.proof-hero > span,
+.proof-reproduce > span {
+  display: block;
+  margin-bottom: 12px;
+  font-family: "Boogaloo", cursive;
+  font-size: clamp(12px, 1.4vw, 15px);
+  letter-spacing: 0.45em;
+  opacity: 0.68;
+}
+
+.proof-hero h1 {
+  max-width: 1120px;
+  font-size: clamp(38px, 7vw, 94px);
+  font-weight: 400;
+  line-height: 0.98;
+  color: #000000;
+}
+
+.proof-hero p,
+.proof-reproduce p {
+  max-width: 820px;
+  margin-top: 18px;
+  color: #000000;
+}
+
+.proof-intro,
+.proof-table-wrap,
+.proof-reproduce {
+  margin-top: 28px;
+  padding: 30px;
+  background: var(--white);
+  border: 3px solid #000000;
+  box-shadow: 10px 10px 0 #000000;
+  color: #000000;
+}
+
+.proof-intro h2,
+.proof-reproduce h2 {
+  max-width: 900px;
+  font-size: clamp(26px, 4vw, 52px);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.proof-intro ul {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding-left: 22px;
+  font-family: "Inter", sans-serif;
+  font-size: clamp(14px, 1.5vw, 18px);
+  line-height: 1.45;
+}
+
+.proof-intro li::marker {
+  color: var(--pink);
+}
+
+.proof-table-wrap {
+  overflow-x: auto;
+}
+
+.proof-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-family: "Inter", sans-serif;
+  font-size: clamp(14px, 1.35vw, 17px);
+}
+
+.proof-table th,
+.proof-table td {
+  padding: 16px;
+  border-bottom: 2px solid #000000;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.proof-table th {
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.proof-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.proof-table a {
+  font-weight: 700;
+}
+
+.proof-table a:hover,
+.proof-table a:focus {
+  color: var(--pink);
+}
+
+.pass-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 6px 10px;
+  background: var(--lime);
+  border: 2px solid #000000;
+  font-weight: 700;
+}
+
+.proof-reproduce pre {
+  margin: 20px 0;
+  padding: 18px;
+  overflow-x: auto;
+  background: var(--lime);
+  border: 3px solid #000000;
+  font-family: "Inter", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.proof-reproduce code {
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+}
+
+.proof-reproduce .hero-button {
+  margin-top: 20px;
+}
+
 a {
   text-decoration: none;
   color: inherit;
@@ -896,6 +1039,17 @@ a:visited {
 
   .use-cases-page {
     padding: 48px 5% 68px;
+  }
+
+  .proof-page {
+    padding: 48px 5% 70px;
+  }
+
+  .proof-intro,
+  .proof-table-wrap,
+  .proof-reproduce {
+    padding: 22px;
+    box-shadow: 7px 7px 0 #000000;
   }
 
   .use-case-grid {

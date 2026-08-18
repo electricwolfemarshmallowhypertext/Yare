@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yare Proof Bench</title>
+  <meta name="description" content="Yare Handoff Integrity Bench proof matrix for durable agent work memory.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Boogaloo&family=Inter:wght@300;400;600;700&family=Rubik+Mono+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body id="top">
+  <nav class="site-nav" aria-label="Primary navigation">
+    <a class="nav-brand" href="/">Yare</a>
+    <div class="nav-center">
+      <a href="/proof">Proof</a>
+      <a href="/use-cases">Use Cases</a>
+      <a href="/demo">Demo</a>
+      <a href="https://github.com/electricwolfemarshmallowhypertext/Yare" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
+    </div>
+    <a class="nav-contact" href="mailto:smith@antiparty.co">Contact</a>
+  </nav>
+
+  <main class="proof-page">
+    <header class="proof-hero">
+      <span>PROOF BENCH</span>
+      <h1>Yare Handoff Integrity Bench</h1>
+      <p>Yare was tested on messy AI coding handoffs with conflicting agent claims, changed files, unresolved approvals, and receipts.</p>
+    </header>
+
+    <section class="proof-intro" aria-label="What the bench verifies">
+      <h2>The bench verifies that Yare can:</h2>
+      <ul>
+        <li>compile scattered agent output into one current-state handoff</li>
+        <li>detect contradictions</li>
+        <li>preserve receipts</li>
+        <li>persist memory in CockroachDB</li>
+        <li>archive proof artifacts to S3</li>
+        <li>expose the same handoff through MCP</li>
+        <li>show how work-state changed over time</li>
+      </ul>
+    </section>
+
+    <section class="proof-table-wrap" aria-label="Proof matrix">
+      <table class="proof-table">
+        <thead>
+          <tr>
+            <th>Proof</th>
+            <th>Result</th>
+            <th>Evidence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Real CockroachDB write/read</td>
+            <td><span class="pass-pill">PASS</span></td>
+            <td><a href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/COCKROACH_SMOKE_RESULT.md" target="_blank" rel="noopener">Smoke result</a></td>
+          </tr>
+          <tr>
+            <td>Real S3 receipt archive</td>
+            <td><span class="pass-pill">PASS</span></td>
+            <td><a href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/S3_SMOKE_RESULT.md" target="_blank" rel="noopener">Smoke result</a></td>
+          </tr>
+          <tr>
+            <td>Claude Code MCP read</td>
+            <td><span class="pass-pill">PASS</span></td>
+            <td><a href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/MCP_SMOKE_RESULT.md" target="_blank" rel="noopener">MCP result</a></td>
+          </tr>
+          <tr>
+            <td>Codex MCP read</td>
+            <td><span class="pass-pill">PASS</span></td>
+            <td><a href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/CODEX_MCP_SMOKE_RESULT.md" target="_blank" rel="noopener">MCP result</a></td>
+          </tr>
+          <tr>
+            <td>Cursor MCP read</td>
+            <td><span class="pass-pill">PASS</span></td>
+            <td><a href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/CURSOR_MCP_SMOKE_RESULT.md" target="_blank" rel="noopener">MCP result</a></td>
+          </tr>
+          <tr>
+            <td>Vector memory search</td>
+            <td><span class="pass-pill">PASS</span></td>
+            <td><a href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/VECTOR_SMOKE_RESULT.md" target="_blank" rel="noopener">Vector result</a></td>
+          </tr>
+          <tr>
+            <td>Timeline diff</td>
+            <td><span class="pass-pill">PASS</span></td>
+            <td><a href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/MEMORY_TIMELINE_RESULT.md" target="_blank" rel="noopener">Timeline result</a></td>
+          </tr>
+          <tr>
+            <td>Deterministic receipt hash</td>
+            <td><span class="pass-pill">PASS</span></td>
+            <td><a href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/REAL_USE_CASE_RESULT.md" target="_blank" rel="noopener">Handoff result</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="proof-reproduce" aria-label="Reproduce the bench">
+      <span>REPRODUCE</span>
+      <h2>Run the bench locally.</h2>
+      <p>Run the sample handoff compile. Add live env vars when you want CockroachDB memory and S3 archive checks included.</p>
+      <pre><code>.\scripts\proof-bench.ps1</code></pre>
+      <p>Set <code>YARE_DATABASE_URL</code> or pass <code>-DatabaseUrl</code> for CockroachDB checks. Set <code>YARE_S3_BUCKET</code> or pass <code>-S3Bucket</code> plus AWS credentials for S3 archive checks. Missing live config is reported as skipped, not failed.</p>
+      <a class="hero-button primary" href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/HANDOFF_INTEGRITY_BENCH.md" target="_blank" rel="noopener">Read bench doc</a>
+      <a class="hero-button pink" href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/HANDOFF_INTEGRITY_BENCH_RESULT.md" target="_blank" rel="noopener">Latest bench result</a>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-copy">
+      <p>&copy; 2026 Antiparty, Inc. | <strong>Yare</strong> is open source under the <strong>MIT License</strong>.</p>
+      <p><strong>Privacy:</strong> This static demo site does not collect personal data.</p>
+      <p><strong>Terms:</strong> Yare is provided as open-source software without warranty.</p>
+      <p><a href="mailto:smith@antiparty.co"><strong>Contact</strong></a></p>
+    </div>
+    <div class="footer-logo">YARE</div>
+  </footer>
+</body>
+</html>
