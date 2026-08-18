@@ -4,6 +4,8 @@
 
 Yare shows the next agent what happened, what changed, what is still unresolved, and what needs human review.
 
+Yare uses CockroachDB as a durable state ledger for agent work.
+
 ## Try It
 
 - Live demo: https://yare-vert.vercel.app/demo
