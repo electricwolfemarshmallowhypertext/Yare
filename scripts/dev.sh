@@ -7,7 +7,7 @@ METRICS_PORT="${METRICS_PORT:-9090}"
 
 if ! redis-cli -u redis://localhost:6379 ping >/dev/null 2>&1; then
   echo "[dev] Starting Redis via Docker..."
-  docker run --name sticky-redis -p 6379:6379 -d --rm redis:7-alpine >/dev/null
+  docker run --name yare-redis -p 6379:6379 -d --rm redis:7-alpine >/dev/null
 fi
 
 export ENV="${ENV:-development}"

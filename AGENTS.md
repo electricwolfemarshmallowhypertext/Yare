@@ -1,10 +1,10 @@
 # Yare Project Instructions
 
 ## Project Rules
-- Keep Sticky persona architecture internal as behavioral architecture packs.
+- Keep internal persona architecture hidden behind behavioral architecture packs.
 - Public surface area is verified work-state memory: instructions, skills, memory, policies, evals, receipts.
 - Hackathon architecture: CockroachDB is the primary system of record for verified working memory.
-- Local `.yare` and `.sticky` files may remain as optional fallback/export modes.
+- Local export files may remain as optional fallback/export modes.
 - Do not build a notes product workflow or persona marketplace workflow in Yare v1.
 
 ## Setup Commands

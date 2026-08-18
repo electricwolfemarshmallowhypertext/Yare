@@ -1,4 +1,4 @@
-# Sticky Current State
+# Yare Current State
 
 Task: compile ai work lead state
 Deterministic Hash: a9ccb7bd56bcf357aaf852683387eb72bc8b7f2f78b374ac55ad8680114282c4
@@ -12,7 +12,7 @@ Artifacts Ingested: 3
 
 ## What Is True
 - Endpoint returns latest receipt
-- README includes AI Work Lead section
+- README includes Yare handoff section
 - Receipt includes git dirty status
 
 ## What Is Unverified

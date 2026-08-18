@@ -33,11 +33,11 @@ jobs:
         shell: pwsh
         run: python -m pytest -q tests/yare/test_yare_cli.py
 
-      - name: Run AI Work Lead demo
+      - name: Run Yare handoff demo
         shell: pwsh
         run: .\scripts\demo-lead-compile.ps1
 
-      - name: Upload AI Work Lead proof artifacts
+      - name: Upload Yare proof artifacts
         uses: actions/upload-artifact@v4
         with:
           name: yare-lead-proof

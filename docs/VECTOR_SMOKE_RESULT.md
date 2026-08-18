@@ -65,7 +65,7 @@ distance: 0.876909
 current_state_hash: 3e17416e734594685d1aa33a5502c0a4d0079595273e1e95b181e7b8a56d8a8a
 text:
 Endpoint returns latest receipt
-README includes AI Work Lead section
+README includes Yare handoff section
 Receipt includes git dirty status
 
 result: 3
