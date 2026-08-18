@@ -8,11 +8,14 @@ It gives agents and humans a clean handoff: what changed, what is true, what is 
 
 - Site: https://yare-vert.vercel.app/
 - Use cases: https://yare-vert.vercel.app/use-cases.html
+- Proof bench: https://yare-vert.vercel.app/proof
 - GitHub: https://github.com/electricwolfemarshmallowhypertext/Yare
 - License: https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/LICENSE
 
 ## Proof
 
+- Yare Handoff Integrity Bench: https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/HANDOFF_INTEGRITY_BENCH.md
+- Latest Handoff Integrity Bench result: https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/HANDOFF_INTEGRITY_BENCH_RESULT.md
 - CockroachDB memory smoke: https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/COCKROACH_SMOKE_RESULT.md
 - Real handoff demo: https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/REAL_USE_CASE_RESULT.md
 - S3 archive smoke: https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/S3_SMOKE_RESULT.md

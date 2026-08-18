@@ -1,110 +1,122 @@
 # Yare
 
-**Durable work memory for AI agents.**
+**Shared work memory for AI agents.**
 
-Yare gives coding agents a clean handoff: what changed, what is true, what is unresolved, what needs human review, and what to do next.
+Yare shows the next agent what happened, what changed, what is still unresolved, and what needs human review.
 
-It stores that memory in CockroachDB, archives proof artifacts to S3, and lets agent clients inspect the same state through CockroachDB Managed MCP.
+## Try It
 
-## Why Yare Exists
+- Live demo: https://yare-vert.vercel.app/demo
+- Project site: https://yare-vert.vercel.app/
+- Use cases: https://yare-vert.vercel.app/use-cases.html
 
-AI coding work gets messy fast.
+## Why It Exists
 
-One agent changes files.
-Another claims tests passed.
-CI says something else.
-A human comes back later and has to reconstruct the truth from chats, logs, diffs, and guesses.
+AI coding work gets scattered fast.
 
-Yare keeps the work state readable.
+Codex changes files. Claude explains something else. Cursor picks it up later. CI adds another signal. Then a human has to reconstruct the truth from chats, logs, diffs, and guesses.
 
-## What Yare Gives You
+Yare gives the work one shared memory.
 
-- changed files
-- verified facts
-- unverified claims
-- contradictions
-- human approval items
-- open loops
-- proof receipts
-- next clean action
+## What It Does
+
+Yare turns agent work into a clear handoff:
+
+- what changed
+- what is true
+- what is unresolved
+- what contradicts
+- what needs review
+- what changed since the last run
+- what to do next
 
 ## How It Works
 
 ```text
 AI/tool runs
--> Lead Artifacts
--> Yare compile
--> CockroachDB memory
--> S3 proof archive
--> agent handoff
+→ Lead Artifacts
+→ Yare compile
+→ CockroachDB memory
+→ vector search + timeline diff
+→ S3 archive
+→ next-agent handoff
 ```
 
-CockroachDB is the durable memory store.
-S3 stores proof artifacts.
-Local `.yare` and `.sticky` files remain export/fallback files.
+CockroachDB stores the memory.
+S3 stores the artifacts.
+MCP lets agent clients inspect the same state.
 
-## Real Demo
+## What Makes It Useful
 
-```powershell
-.\scripts\demo-real-use-case.ps1
-```
+Yare does not just save notes.
 
-The demo compiles prior AI runs, stores the state in CockroachDB, reads it back, and prints a handoff another agent can use.
+It keeps a durable work state, tracks how that state changes over time, supports semantic search across prior handoffs, and keeps receipts humans can review.
 
-## Proof
+## Verified With
 
-- CockroachDB memory smoke: `docs/COCKROACH_SMOKE_RESULT.md`
-- Real handoff demo: `docs/REAL_USE_CASE_RESULT.md`
-- S3 archive smoke: `docs/S3_SMOKE_RESULT.md`
-- Claude Code MCP proof: `docs/MCP_SMOKE_RESULT.md`
-- Codex MCP proof: `docs/CODEX_MCP_SMOKE_RESULT.md`
-- Cursor MCP proof: `docs/CURSOR_MCP_SMOKE_RESULT.md`
+- CockroachDB durable memory
+- CockroachDB Distributed Vector Indexing
+- CockroachDB Managed MCP
+- Amazon S3 archive
+- Claude Code
+- Codex
+- Cursor
+- Vercel live demo
 
-## Use Cases
-
-See `docs/use-cases/`.
-
-Start here:
-
-- AI coding teams
-- Engineering audit
-- Compliance teams
-- Vibe coders
-- Content and research operators
-- Devtool founders and AI agencies
+Details are in `docs/`.
 
 ## Quickstart
 
 ```bash
 git clone https://github.com/electricwolfemarshmallowhypertext/Yare.git
 cd Yare
-```
-
-```powershell
 python -m pip install -r requirements-cli.txt
 python -m cli.yare doctor
+```
+
+Run the demo compile:
+
+```powershell
 .\scripts\demo-lead-compile.ps1
 ```
 
+Run the handoff demo:
+
+```powershell
+.\scripts\demo-real-use-case.ps1
+```
+
 ## CockroachDB
+
+Set `YARE_DATABASE_URL` to store memory in CockroachDB:
 
 ```powershell
 $env:YARE_DATABASE_URL = "postgresql://USER:PASSWORD@HOST:26257/defaultdb?sslmode=verify-full"
 python -m cli.yare storage init
 ```
 
-## S3 Archive
+## Core Commands
 
 ```powershell
-$env:YARE_S3_BUCKET = "your-bucket"
-$env:YARE_S3_PREFIX = "yare/"
+python -m cli.yare storage init
+python -m cli.yare lead compile --task "compile ai work lead state" --artifact examples/lead-artifacts/run-codex.jsonl --artifact examples/lead-artifacts/run-claude.json --artifact examples/lead-artifacts/run-gemini.jsonl
+python -m cli.yare memory search --query "what still needs human review?" --limit 3
+python -m cli.yare memory timeline
+python -m cli.yare memory diff --latest
 ```
 
-## Core Command
+## Use Cases
 
-```powershell
-.\yare.cmd lead compile --task "compile ai work lead state" --artifact examples/lead-artifacts/run-codex.jsonl --artifact examples/lead-artifacts/run-claude.json --artifact examples/lead-artifacts/run-gemini.jsonl
-```
+See `docs/use-cases/`.
+
+Start with:
+
+- AI coding teams
+- engineering audit
+- compliance teams
+- vibe coders
+- content and research operators
+- devtool founders and AI agencies
 
 ## License
 
