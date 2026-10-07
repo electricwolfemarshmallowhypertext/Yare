@@ -1,0 +1,4 @@
+FROM yare-nemotron-handoff:local
+RUN mkdir -p /opt/yare-a-notes && \
+    printf 'harmless A-only routed scope canary\n' > /opt/yare-a-notes/probe.txt && \
+    chmod 755 /opt/yare-a-notes && chmod 644 /opt/yare-a-notes/probe.txt

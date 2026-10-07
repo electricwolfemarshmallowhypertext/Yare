@@ -96,11 +96,13 @@ class Budget:
 
 
 class TokenFactory:
+    transport = "host controller"
+
     def __init__(self, key, budget, evidence_dir):
         self.key, self.budget, self.evidence_dir = key, budget, evidence_dir
 
     def models(self, configured):
-        response = requests.get(API + "/models", headers={"Authorization": "Bearer " + self.key}, timeout=30)
+        response = self.request("GET", "/models")
         if response.status_code != 200:
             raise ValueError(f"Model list HTTP {response.status_code}")
         ids = [item["id"] for item in response.json()["data"]]
@@ -112,13 +114,16 @@ class TokenFactory:
             result.append(matches[0])
         return result
 
+    def request(self, method, path, payload=None):
+        return requests.request(method, API + path, json=payload,
+                                headers={"Authorization": "Bearer " + self.key}, timeout=120)
+
     def complete(self, model, messages):
         payload = {"model": model, "messages": messages, "max_tokens": OUTPUT_CAP, "temperature": 0}
         index = self.budget.reserve(model, payload)
         started = time.monotonic()
         try:
-            response = requests.post(API + "/chat/completions", json=payload,
-                                     headers={"Authorization": "Bearer " + self.key}, timeout=120)
+            response = self.request("POST", "/chat/completions", payload)
         except requests.RequestException:
             self.budget.halt("Inference transport failure; usage unknown")
             raise ValueError("Inference transport failure; reservation retained") from None
@@ -128,7 +133,7 @@ class TokenFactory:
         result = response.json()
         # No headers, credential-bearing settings, or database URLs enter evidence.
         save_json(self.evidence_dir / f"call-{index + 1:02d}.json", {
-            "provider": "Nebius Token Factory", "model": model, "request": payload,
+            "provider": "Nebius Token Factory", "transport": self.transport, "model": model, "request": payload,
             "response": result, "request_id": response.headers.get("x-request-id"),
             "elapsed_seconds": round(time.monotonic() - started, 3),
         })
@@ -148,12 +153,12 @@ class OpenShellRepo:
                     "XDG_CONFIG_HOME=" + linux_root + "/.tmp/openshell-v0.1.2/config",
                     linux_root + "/.tmp/openshell-v0.1.2/openshell", "-g", "yare"]
 
-    def execute(self, *command):
+    def execute(self, *command, timeout=30, output_limit=16000):
         result = subprocess.run(self.cli + ["sandbox", "exec", "--name", self.sandbox,
-                                "--workdir", "/tmp/yare-task/nemotron-task", "--timeout", "30", "--no-tty",
-                                "--no-login-shell", "--", *command], capture_output=True, text=True, timeout=45)
+                                "--workdir", "/tmp/yare-task/nemotron-task", "--timeout", str(timeout), "--no-tty",
+                                "--no-login-shell", "--", *command], capture_output=True, text=True, timeout=timeout + 15)
         return {"command": list(command), "exit_code": result.returncode,
-                "stdout": result.stdout[:16000], "stderr": result.stderr[:16000]}
+                "stdout": result.stdout[:output_limit], "stderr": result.stderr[:output_limit]}
 
     def read(self, name):
         if name not in ("workstate.py", "test_workstate.py"):
