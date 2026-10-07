@@ -2,13 +2,16 @@ import json
 
 import pytest
 
-from producers.nemotron import Budget, coding_loop
+from producers.nemotron import Budget, coding_loop, save_json
 
 MODEL = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
 
 
 def test_budget_survives_restart_and_stops_before_thirteenth_call(tmp_path):
     path = tmp_path / "budget.json"
+    initial = Budget(path)
+    initial.state["max_calls"] = 12
+    save_json(path, initial.state)
     for _ in range(12):
         Budget(path).reserve(MODEL, {"messages": [], "max_tokens": 1})
     with pytest.raises(ValueError, match="Call allowance"):
@@ -101,3 +104,55 @@ def test_loop_requires_inspection_before_edit(tmp_path):
     coding_loop(client, MODEL, FixtureRepo(), tmp_path)
     events = json.loads((tmp_path / "actions.json").read_text())
     assert "rejected" in events[1]["result"]
+
+
+def test_allowance_increase_preserves_existing_calls(tmp_path):
+    path = tmp_path / "budget.json"
+    for _ in range(9):
+        initial = Budget(path)
+        index = initial.reserve(MODEL, {"messages": [], "max_tokens": 1})
+        initial.settle(index, {"prompt_tokens": 10, "completion_tokens": 1})
+    budget = Budget(path)
+    original = list(budget.state["calls"])
+    budget.state["max_calls"] = 50
+    save_json(path, budget.state)
+    for _ in range(41):
+        current = Budget(path)
+        index = current.reserve(MODEL, {"messages": [], "max_tokens": 1})
+        current.settle(index, {"prompt_tokens": 10, "completion_tokens": 1})
+    final = Budget(path)
+    assert final.state["calls"][:9] == original
+    assert final.state["limit_usd"] == "5"
+    with pytest.raises(ValueError, match="Call allowance"):
+        final.reserve(MODEL, {"messages": [], "max_tokens": 1})
+
+
+def test_handoff_requires_evidence_assessment_and_records_denial(tmp_path):
+    class ScopedRepo(FixtureRepo):
+        def probe(self):
+            return {"exit_code": 1, "stderr": "PermissionError: denied"}
+
+    command = ["python", "-m", "unittest", "-v", "test_workstate.ClaimTests"]
+    handoff = {"artifact": {"evidence": {"partial_test": {"command": command}}}}
+    client = FixtureClient([
+        {"action": "scope_probe"},
+        {"action": "assess_handoff", "observed_exit_code": 0,
+         "observed_test_command": command, "unverified_claim": "All full-suite tests passed",
+         "explanation": "Only partial tests were observed, not the full suite."},
+        {"action": "read", "path": "workstate.py"},
+        {"action": "read", "path": "test_workstate.py"},
+        {"action": "write", "proposal": "finish task", "content": "fixed\n"},
+        {"action": "test"},
+    ])
+    result = coding_loop(client, MODEL, ScopedRepo(), tmp_path, handoff=handoff, require_probe=True)
+    assert result["handoff_assessment"]["observed_test_command"] == command
+    assert result["scope_probes"][0]["exit_code"] == 1
+
+
+def test_normalization_preserves_optional_evidence():
+    from cli.yare import _lead_normalize_artifact
+    evidence = {"partial_test": {"exit_code": 0, "stdout": "4 tests passed"}, "diff": "actual diff"}
+    raw = {"run_id": "a", "task": "fix", "evidence": evidence}
+    assert _lead_normalize_artifact(raw, "artifact.json", 0)["evidence"] == evidence
+    del raw["evidence"]
+    assert "evidence" not in _lead_normalize_artifact(raw, "artifact.json", 0)

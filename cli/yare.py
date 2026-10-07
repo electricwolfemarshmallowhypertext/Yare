@@ -1175,7 +1175,7 @@ def _lead_normalize_artifact(raw: dict[str, Any], source_ref: str, index: int) -
         material = json.dumps(raw, sort_keys=True, separators=(",", ":")).encode("utf-8")
         run_id = hashlib.sha256(material + f"{source_ref}:{index}".encode("utf-8")).hexdigest()[:16]
 
-    return {
+    normalized = {
         "run_id": run_id,
         "timestamp": timestamp,
         "source_artifact": source_ref,
@@ -1193,6 +1193,9 @@ def _lead_normalize_artifact(raw: dict[str, Any], source_ref: str, index: int) -
         "source_artifacts": _lead_to_str_list(raw.get("source_artifacts")),
         "git_state": _lead_extract_git_state(raw),
     }
+    if isinstance(raw.get("evidence"), dict):
+        normalized["evidence"] = raw["evidence"]
+    return normalized
 
 
 def _lead_collect_artifact_paths(root: Path, explicit: list[Path]) -> list[Path]:
