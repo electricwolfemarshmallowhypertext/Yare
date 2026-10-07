@@ -1,12 +1,12 @@
 # Nemotron A/B Durable Handoff
 
-Status: PASS for the live coding, CockroachDB handoff, restart, and filesystem
-permission tests on October 7, 2026. This is a narrow isolated coding task, not
-a general benchmark or a public hosted coding agent.
+Status: PASS for the live coding, CockroachDB handoff, and restart on October 7,
+2026. The historical filesystem test used a planted canary. It does not prove
+that real work or secrets were protected. This is a narrow isolated coding task,
+not a general benchmark or a public hosted coding agent.
 
-The decisive check: two real coding runs, two permission scopes, one durable
-handoff, and a final passing test. Yare supplies continuity; Nemotron supplies
-the coding.
+The decisive check here is two real coding runs, one durable handoff, and a final
+passing test. Yare supplies continuity; Nemotron supplies the coding.
 
 ## Factual Review
 
@@ -18,12 +18,12 @@ status case and whitespace. Only `workstate.py` may be edited; tests are fixed.
 | Agent A coding | Live Nano calls; inspected files, proposed and wrote evidence check |
 | A partial tests | Four `ClaimTests` passed; independent rerun passed |
 | A full tests | Six tests ran; two normalization failures remained |
-| A scope | Read `/tmp/a-notes/probe.txt` successfully |
+| A synthetic scope probe | Read planted `/tmp/a-notes/probe.txt` successfully |
 | Durable handoff | Compile stored source, diff, tests, unresolved work, and receipt in CockroachDB |
 | Restart | A process exited; A sandbox stopped and deleted; list returned no sandboxes |
 | Agent B continuity | New process and sandbox loaded A's state and artifact from CockroachDB, not A's chat |
 | B assessment | Correctly identified A's partial-test success and unsupported full-suite claim |
-| B denied action | Same canary read returned exit 1 and `PermissionError: [Errno 13]` |
+| B synthetic scope probe | Same planted file read returned exit 1 and `PermissionError: [Errno 13]` |
 | B allowed work | Live Nano calls inspected, proposed and wrote normalization change |
 | B final tests | All six tests passed; independent reruns passed |
 
@@ -81,11 +81,14 @@ artifacts. A's stored full-suite exit is 1; B's is 0. Source hashes differ.
 
 ## Permissions
 
-OpenShell v0.1.2 runs both agents with Landlock `hard_requirement`. The same
-image contains a harmless, world-readable canary; both agents use UID/GID 1000.
+In this historical run, OpenShell v0.1.2 ran both agents with Landlock
+`hard_requirement`. The old image contained a planted, world-readable canary;
+both agents used UID/GID 1000.
 A's policy includes `/tmp/a-notes` in read-only paths; B's does not. Both may
 write `/tmp/yare-task`. Both have empty network policies. The demonstrated
-scope difference is filesystem access, not distinct network or process rules.
+scope difference was access to that planted file, not a meaningful real-work
+boundary or distinct network or process rules. The current producer no longer
+creates or probes this canary. Its removal has not been rerun against live models.
 
 OpenShell reported isolation enforcement confirmed and B's effective policy
 revision 1 with hash
@@ -119,7 +122,9 @@ Prerequisites: Python CLI dependencies, Docker, Ubuntu WSL2, the authenticated
 [the first test](NEMOTRON_FIRST_TEST.md). Privately populate ignored `.env.nebius`
 with `NEBIUS_API_KEY`, `NEBIUS_MODEL_ID`, `NEBIUS_EXPLAIN_MODEL_ID`, and
 `YARE_DATABASE_URL`. Never print or commit it. Use a new run ID for each rerun;
-do not reset the shared budget ledger.
+do not reset the shared budget ledger. These commands document the historical
+run; rebuilding the current image no longer creates the canary or tests its
+permission result.
 
 ```powershell
 docker build -t yare-nemotron-handoff:local examples/nemotron-handoff

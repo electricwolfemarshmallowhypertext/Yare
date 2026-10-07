@@ -1,8 +1,9 @@
 # Nebius Provider Routing
 
 Status on October 7, 2026: **PASS for the live routed A/B test**. Native model
-discovery, two coding runs, durable handoff, restart, distinct filesystem scopes,
-and final tests were verified. B's first attempt failed during an OpenShell
+discovery, two coding runs, durable handoff, restart, and final tests were
+verified. The filesystem probe used a planted canary and does not prove a
+meaningful real-work boundary. B's first attempt failed during an OpenShell
 startup refresh; the authorized retry completed without another refresh. The
 unknown request's full reservation remains charged.
 
@@ -53,8 +54,11 @@ Provider attachment enriches the effective filesystem policy with writable
 `/tmp`. Therefore the routed test uses a world-readable canary under
 `/opt/yare-a-notes/probe.txt`, not the original `/tmp` canary. A can read it;
 B receives `PermissionError: [Errno 13]`. Both use UID/GID 1000 and Landlock
-`hard_requirement`. This proves a filesystem scope difference, not distinct
-network or process scopes.
+`hard_requirement`. This historical probe proves only that the two policies
+treated the planted file differently, not that real work or secrets were
+protected. It does not demonstrate distinct network or process scopes. The
+current producer no longer creates or probes the canary; no live rerun has been
+made after that removal.
 
 A separate, credential-free request to `/v1/yare-forbidden-probe` received HTTP
 403. No authorization header or credential access was used in that negative
@@ -161,7 +165,8 @@ docker build -t yare-nemotron-routed:local -f examples/nemotron-handoff/Dockerfi
 `setup` lints and imports the profile, then creates the provider. Import is
 create-only; do not blindly rerun it against an existing profile/provider.
 
-Commands for the live routed attempt:
+Commands for the historical live routed attempt. Rebuilding the current images
+does not recreate the canary or its permission result:
 
 ```powershell
 wsl -d Ubuntu -- env XDG_CONFIG_HOME=/mnt/e/yare/.tmp/openshell-v0.1.2/config /mnt/e/yare/.tmp/openshell-v0.1.2/openshell -g yare sandbox create --name yare-route-a --from yare-nemotron-routed:local --policy /mnt/e/yare/examples/nemotron-handoff/agent-a-routed.yaml --provider yare-nebius-tokenfactory --detach -- python -c 'import time; time.sleep(3600)'

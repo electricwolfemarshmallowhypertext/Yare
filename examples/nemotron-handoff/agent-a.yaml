@@ -1,7 +1,7 @@
 version: 1
 filesystem_policy:
   include_workdir: false
-  read_only: [/usr, /lib, /lib64, /etc, /proc, /sandbox, /tmp/a-notes]
+  read_only: [/usr, /lib, /lib64, /etc, /proc, /sandbox]
   read_write: [/dev, /tmp/yare-task]
 landlock:
   compatibility: hard_requirement
