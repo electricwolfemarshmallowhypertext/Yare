@@ -5,11 +5,13 @@ Status: PASS for one coding producer smoke, run on October 7, 2026.
 This test called Nebius Token Factory, edited a disposable Python repository,
 and ran its tests through OpenShell v0.1.2. It does not establish the complete
 two-agent handoff, restart continuity, distinct permission scopes, or provider
-credential routing inside OpenShell. Those checks remain pending.
+credential routing inside OpenShell. Those checks were pending at the time of
+this first test; later results are linked below.
 
-Follow-up: [the live A/B result](NEMOTRON_HANDOFF_RESULT.md) now documents
-durable handoff, restart, and distinct filesystem scopes. Figures below describe
-the initial test allowance, before its later increase to 50 total calls.
+Follow-up: [the live A/B result](NEMOTRON_HANDOFF_RESULT.md) documents durable
+handoff and restart. Its filesystem denial used a planted canary, not a
+meaningful real-work boundary. Figures below describe the initial test
+allowance, before its later increase to 50 total calls.
 
 ## Model Verification
 
@@ -130,5 +132,7 @@ Fixture results are not live-model proof.
 - Unknown charges retain the pre-request reservation and stop the test.
 - Docker/workload images and the model service can change independently;
   the OpenShell components are pinned to v0.1.2.
-- Distinct A/B policies, forbidden-access evidence, durable handoff, restart
-  proof, and public judge access remain pending.
+- At the time of this first smoke, A/B policies, forbidden-access evidence,
+  durable handoff, restart proof, and public judge access were pending. The
+  later A/B and routed results cover handoff, restart, and a synthetic file
+  denial; meaningful boundary proof and public upgrade access remain open.
