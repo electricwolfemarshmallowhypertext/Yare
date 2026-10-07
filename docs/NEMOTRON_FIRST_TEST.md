@@ -7,6 +7,10 @@ and ran its tests through OpenShell v0.1.2. It does not establish the complete
 two-agent handoff, restart continuity, distinct permission scopes, or provider
 credential routing inside OpenShell. Those checks remain pending.
 
+Follow-up: [the live A/B result](NEMOTRON_HANDOFF_RESULT.md) now documents
+durable handoff, restart, and distinct filesystem scopes. Figures below describe
+the initial test allowance, before its later increase to 50 total calls.
+
 ## Model Verification
 
 An authenticated `GET https://api.tokenfactory.nebius.com/v1/models` confirmed:
