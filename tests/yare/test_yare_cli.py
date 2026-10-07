@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -14,11 +15,25 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from cli import archive as archive_backend
 from cli import storage as storage_backend
-from cli.yare import app
+from cli.yare import _lead_write_receipt, app
 
 
 runner = CliRunner()
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_lead_receipt_hash_includes_optional_access_evidence(tmp_path: Path) -> None:
+    packet = {"task": "boundary", "deterministic_hash": "state-hash", "proof": {"run_id": "run-a"}}
+    evidence = {"path": "/opt/yare-original-checkout/workstate.py", "exit_code": 1,
+                "stderr": "Permission denied"}
+    _, receipt = _lead_write_receipt(tmp_path, packet, "yare lead compile", evidence)
+    assert receipt["access_evidence"] == evidence
+    material = {key: value for key, value in receipt.items() if key != "receipt_hash"}
+    expected = hashlib.sha256(json.dumps(material, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    assert receipt["receipt_hash"] == expected
+    material["access_evidence"]["exit_code"] = 0
+    changed = hashlib.sha256(json.dumps(material, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    assert changed != receipt["receipt_hash"]
 
 
 @pytest.fixture()

@@ -20,7 +20,8 @@ RATES = {
     "nvidia/nemotron-3-super-120b-a12b": (Decimal("0.30"), Decimal("0.90")),
 }
 OUTPUT_CAP = 4096
-TOKEN_CAP = 200000
+CALL_CAP = 500
+TOKEN_CAP = 2000000
 
 
 def read_settings(path):
@@ -62,7 +63,7 @@ class Budget:
         calls = self.state["calls"]
         spent = sum(Decimal(c["charged_usd"]) for c in calls)
         tokens = sum(c["charged_tokens"] for c in calls)
-        if len(calls) >= 100 or len(calls) >= self.state["max_calls"]:
+        if len(calls) >= CALL_CAP or len(calls) >= self.state["max_calls"]:
             raise ValueError("Call allowance exhausted before request")
         if spent + cost > min(Decimal("5"), Decimal(self.state["limit_usd"])):
             raise ValueError("Dollar allowance exhausted before request")
@@ -118,8 +119,10 @@ class TokenFactory:
         return requests.request(method, API + path, json=payload,
                                 headers={"Authorization": "Bearer " + self.key}, timeout=120)
 
-    def complete(self, model, messages):
-        payload = {"model": model, "messages": messages, "max_tokens": OUTPUT_CAP, "temperature": 0}
+    def complete(self, model, messages, *, max_tokens=OUTPUT_CAP, extra_body=None):
+        payload = {"model": model, "messages": messages, "max_tokens": max_tokens, "temperature": 0}
+        if extra_body:
+            payload.update(extra_body)
         index = self.budget.reserve(model, payload)
         started = time.monotonic()
         try:

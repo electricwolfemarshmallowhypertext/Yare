@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import subprocess
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -14,6 +15,33 @@ from cli.yare import compile_lead_state
 from producers.nemotron import Budget, OpenShellRepo, TokenFactory, coding_loop, read_settings, save_json
 
 TASK = "Evidence-based claim classification with case and whitespace normalization"
+ORIGINAL_SOURCE = "/opt/yare-original-checkout/workstate.py"
+
+
+def capture_original_source_access(repo, source_path, phase):
+    policy_result = subprocess.run(repo.cli + ["policy", "get", repo.sandbox, "--full", "-o", "json"],
+                                   capture_output=True, text=True, timeout=30)
+    if policy_result.returncode != 0:
+        raise ValueError("Cannot inspect effective OpenShell policy")
+    policy = json.loads(policy_result.stdout)
+    if policy.get("status") != "effective":
+        raise ValueError("OpenShell policy is not effective")
+    filesystem = policy["policy"]["filesystem_policy"]
+    allowed = any(ORIGINAL_SOURCE == path or ORIGINAL_SOURCE.startswith(path.rstrip("/") + "/")
+                  for path in filesystem["read_only"] + filesystem["read_write"])
+    if allowed != (phase == "a"):
+        raise ValueError("Effective policy does not match A/B source access boundary")
+    result = repo.execute("sha256sum", ORIGINAL_SOURCE)
+    source_hash = hashlib.sha256(source_path.read_bytes()).hexdigest()
+    if phase == "a":
+        if result["exit_code"] != 0 or not result["stdout"].startswith(source_hash + "  "):
+            raise ValueError("A could not read the original task source")
+    elif result["exit_code"] == 0 or "Permission denied" not in result["stderr"]:
+        raise ValueError("B did not receive an enforced source-access denial")
+    return {"path": ORIGINAL_SOURCE, "source_sha256": source_hash,
+            "effective_policy_hash": policy["hash"], "policy_allows_read": allowed,
+            "command": result["command"], "exit_code": result["exit_code"],
+            "stdout": result["stdout"], "stderr": result["stderr"]}
 
 
 def load_handoff(database_url, run_id):
@@ -63,6 +91,8 @@ def main():
     parser.add_argument("--sandbox", required=True)
     parser.add_argument("--routed", action="store_true", help="Call Token Factory through OpenShell provider access")
     parser.add_argument("--stop-on-refresh", action="store_true", help="Stop routed inference if OpenShell refreshes again")
+    parser.add_argument("--boundary-original", action="store_true",
+                        help="Record effective-policy access to the existing task source snapshot")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     settings = read_settings(root / ".env.nebius")
@@ -73,6 +103,11 @@ def main():
     evidence_dir = root / ".tmp/handoff" / args.run_id / args.phase
     target = "test_workstate.ClaimTests" if args.phase == "a" else "test_workstate"
     repo = OpenShellRepo(root, args.sandbox, target)
+    access = None
+    if args.boundary_original:
+        access = capture_original_source_access(
+            repo, root / "examples/nemotron-handoff/workstate.py", args.phase)
+        save_json(evidence_dir / "original-source-access.json", access)
     if args.routed:
         from producers.routing import RoutedTokenFactory
         client = RoutedTokenFactory(repo, budget, evidence_dir, stop_on_refresh=args.stop_on_refresh)
@@ -103,13 +138,17 @@ def main():
     source = repo.read("workstate.py")
     phase = args.phase.upper()
     policy_suffix = "-routed" if args.routed else ""
-    policy = root / "examples/nemotron-handoff" / f"agent-{args.phase}{policy_suffix}.yaml"
+    policy_name = f"agent-{args.phase}-boundary.yaml" if args.boundary_original else f"agent-{args.phase}{policy_suffix}.yaml"
+    policy = root / "examples/nemotron-handoff" / policy_name
     artifact = make_artifact(args.run_id + "-" + args.phase, phase, result, source, full_test,
                              hashlib.sha256(policy.read_bytes()).hexdigest())
     artifact["evidence"]["inference_transport"] = "OpenShell endpoint-bound provider" if args.routed else "host controller"
+    if access is not None:
+        artifact["evidence"]["original_source_access"] = access
     artifact_path = evidence_dir / "lead-artifact.json"
     save_json(artifact_path, artifact)
-    packet, _, _, receipt_path, receipt, _ = compile_lead_state(root, TASK, [artifact_path], validate_artifacts=True)
+    packet, _, _, receipt_path, receipt, _ = compile_lead_state(
+        root, TASK, [artifact_path], validate_artifacts=True, receipt_evidence=access)
     stored = load_handoff(settings["YARE_DATABASE_URL"], artifact["run_id"])
     if stored["artifact"].get("evidence") != artifact["evidence"]:
         raise ValueError("Stored artifact lost handoff evidence")

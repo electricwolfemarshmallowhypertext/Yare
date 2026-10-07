@@ -110,6 +110,7 @@ def test_allowance_increase_preserves_existing_calls(tmp_path):
     path = tmp_path / "budget.json"
     initial = Budget(path)
     initial.state["max_calls"] = 50
+    initial.state["max_tokens"] = 200000
     save_json(path, initial.state)
     for _ in range(45):
         initial = Budget(path)
@@ -117,16 +118,30 @@ def test_allowance_increase_preserves_existing_calls(tmp_path):
         initial.settle(index, {"prompt_tokens": 10, "completion_tokens": 1})
     budget = Budget(path)
     original = list(budget.state["calls"])
-    budget.state["max_calls"] = 100
+    budget.state["max_calls"] = 250
+    budget.state["max_tokens"] = 2000000
     save_json(path, budget.state)
-    for _ in range(55):
+    for _ in range(205):
         current = Budget(path)
         index = current.reserve(MODEL, {"messages": [], "max_tokens": 1})
         current.settle(index, {"prompt_tokens": 10, "completion_tokens": 1})
     final = Budget(path)
     assert final.state["calls"][:45] == original
-    assert final.state["max_calls"] == 100
+    assert final.state["max_calls"] == 250
+    assert final.state["max_tokens"] == 2000000
     assert final.state["limit_usd"] == "5"
+    final.state["max_calls"] = 500
+    save_json(path, final.state)
+    raised = Budget(path)
+    assert raised.state["calls"] == final.state["calls"]
+    assert raised.state["max_calls"] == 500
+    assert raised.state["max_tokens"] == 2000000
+    assert raised.state["limit_usd"] == "5"
+    for _ in range(250):
+        current = Budget(path)
+        index = current.reserve(MODEL, {"messages": [], "max_tokens": 1})
+        current.settle(index, {"prompt_tokens": 10, "completion_tokens": 1})
+    final = Budget(path)
     with pytest.raises(ValueError, match="Call allowance"):
         final.reserve(MODEL, {"messages": [], "max_tokens": 1})
 
