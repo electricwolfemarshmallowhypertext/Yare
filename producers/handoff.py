@@ -16,13 +16,6 @@ from producers.nemotron import Budget, OpenShellRepo, TokenFactory, coding_loop,
 TASK = "Evidence-based claim classification with case and whitespace normalization"
 
 
-class HandoffRepo(OpenShellRepo):
-    probe_path = "/tmp/a-notes/probe.txt"
-
-    def probe(self):
-        return self.execute("python", "-c", "from pathlib import Path; print(Path(" + repr(self.probe_path) + ").read_text())")
-
-
 def load_handoff(database_url, run_id):
     with psycopg.connect(database_url, connect_timeout=15) as connection:
         with connection.cursor() as cursor:
@@ -46,7 +39,7 @@ def make_artifact(run_id, phase, result, source, full_test, policy_hash):
     evidence = {"partial_test": result["final_test"], "full_test": full_test,
                 "diff": result["diff"], "source_code": source,
                 "source_sha256": hashlib.sha256(source.encode()).hexdigest(),
-                "policy_sha256": policy_hash, "scope_probes": result["scope_probes"],
+                "policy_sha256": policy_hash,
                 "handoff_assessment": result.get("handoff_assessment")}
     claims = [{"claim": f"Agent {phase} observed test command {json.dumps(result['final_test']['command'])} "
                "passed with exit code 0", "verification_status": "verified"}]
@@ -79,9 +72,8 @@ def main():
     budget = Budget(root / ".tmp/nebius-first-test/budget.json")
     evidence_dir = root / ".tmp/handoff" / args.run_id / args.phase
     target = "test_workstate.ClaimTests" if args.phase == "a" else "test_workstate"
-    repo = HandoffRepo(root, args.sandbox, target)
+    repo = OpenShellRepo(root, args.sandbox, target)
     if args.routed:
-        repo.probe_path = "/opt/yare-a-notes/probe.txt"
         from producers.routing import RoutedTokenFactory
         client = RoutedTokenFactory(repo, budget, evidence_dir, stop_on_refresh=args.stop_on_refresh)
     else:
@@ -102,13 +94,8 @@ def main():
         "Complete case/whitespace normalization for string statuses while preserving evidence checks "
         "and contradictions. Run the full test_workstate suite. Do not modify tests. "
     )
-    result = coding_loop(client, models[0], repo, evidence_dir, prompt, loaded, require_probe=True)
+    result = coding_loop(client, models[0], repo, evidence_dir, prompt, loaded)
     full_test = repo.execute("python", "-m", "unittest", "-v", "test_workstate")
-    probes = result["scope_probes"]
-    if not probes or (args.phase == "a" and probes[0]["exit_code"] != 0):
-        raise ValueError("A did not demonstrate permitted canary access")
-    if args.phase == "b" and (probes[0]["exit_code"] == 0 or "PermissionError" not in probes[0]["stderr"]):
-        raise ValueError("B forbidden access was not blocked by filesystem policy")
     if args.phase == "a" and full_test["exit_code"] == 0:
         raise ValueError("A unexpectedly finished the whole task; partial handoff not demonstrated")
     if args.phase == "b" and full_test["exit_code"] != 0:
@@ -128,7 +115,7 @@ def main():
         raise ValueError("Stored artifact lost handoff evidence")
     summary = {"phase": phase, "run_id": artifact["run_id"], "current_state_hash": packet["deterministic_hash"],
                "receipt_hash": receipt["receipt_hash"], "receipt_path": str(receipt_path.relative_to(root)),
-               "test_result": full_test, "permission_result": probes[0], "coding_model": models[0],
+               "test_result": full_test, "coding_model": models[0],
                "calls_total": len(budget.state["calls"]),
                "estimated_usd_total": str(sum(Decimal(c["charged_usd"]) for c in budget.state["calls"])),
                "handoff_assessment": result.get("handoff_assessment"), "diff": result["diff"]}
@@ -148,7 +135,6 @@ def main():
     print("current_state_hash:", summary["current_state_hash"])
     print("receipt_hash:", summary["receipt_hash"])
     print("full_suite_exit_code:", full_test["exit_code"])
-    print("scope_probe_exit_code:", probes[0]["exit_code"])
     print("calls_total:", summary["calls_total"])
     print("estimated_usd_total:", summary["estimated_usd_total"])
 

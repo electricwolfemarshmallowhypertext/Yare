@@ -5,12 +5,13 @@ def test_artifact_separates_observed_tests_from_seeded_claim():
     partial = {"command": ["python", "-m", "unittest", "test_workstate.ClaimTests"],
                "exit_code": 0, "stdout": "", "stderr": "Ran 4 tests; OK"}
     full = {"exit_code": 1, "stderr": "FAILED (failures=2)"}
-    result = {"final_test": partial, "diff": "actual diff", "scope_probes": [{"exit_code": 0}]}
+    result = {"final_test": partial, "diff": "actual diff"}
     artifact = handoff.make_artifact("test-a", "A", result, "source", full, "policy-hash")
     assert artifact["claims"][0]["verification_status"] == "verified"
     assert artifact["claims"][1]["verification_status"] == "unverified"
     assert artifact["evidence"]["partial_test"] == partial
     assert artifact["evidence"]["full_test"] == full
+    assert "scope_probes" not in artifact["evidence"]
     assert artifact["open_loops"]
 
 

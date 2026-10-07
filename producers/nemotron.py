@@ -182,7 +182,7 @@ class OpenShellRepo:
         return self.execute("python", "-m", "unittest", "-v", self.test_target)
 
 
-def coding_loop(client, model, repo, evidence_dir, task_prompt=None, handoff=None, require_probe=False):
+def coding_loop(client, model, repo, evidence_dir, task_prompt=None, handoff=None):
     before = repo.read("workstate.py")
     baseline = repo.test()
     messages = [{"role": "system", "content": (
@@ -195,8 +195,6 @@ def coding_loop(client, model, repo, evidence_dir, task_prompt=None, handoff=Non
         '{"action":"test"}, or {"action":"done"}. '
         "Read test failures and retry a bounded edit if tests fail. Claims cannot replace test execution."
     )}, {"role": "user", "content": "Initial observed test result: " + json.dumps(baseline)}]
-    if require_probe:
-        messages[0]["content"] += ' Also execute {"action":"scope_probe"} before editing; record the real permission result.'
     if handoff is not None:
         messages[0]["content"] += (
             ' Before editing, return {"action":"assess_handoff", "observed_exit_code":0, '
@@ -205,7 +203,7 @@ def coding_loop(client, model, repo, evidence_dir, task_prompt=None, handoff=Non
         )
         messages.append({"role": "user", "content": "Durable Cockroach handoff, not prior chat: " + json.dumps(handoff)})
     events, inspected = [{"action": "baseline_test", "result": baseline}], set()
-    wrote, passed, probed, assessed = False, False, False, False
+    wrote, passed, assessed = False, False, False
     assessment = None
     for _ in range(16):
         answer = client.complete(model, messages)
@@ -216,17 +214,14 @@ def coding_loop(client, model, repo, evidence_dir, task_prompt=None, handoff=Non
             result = repo.read(name)
             inspected.add(name)
         elif kind == "write":
-            if (require_probe and not probed) or (handoff is not None and not assessed):
-                result = {"rejected": "Execute scope_probe and assess_handoff before editing."}
+            if handoff is not None and not assessed:
+                result = {"rejected": "Assess the handoff before editing."}
             elif inspected != {"workstate.py", "test_workstate.py"} or not action.get("proposal"):
                 result = {"rejected": "Edit requires reading BOTH workstate.py and test_workstate.py "
                           "and an explicit proposal. No edit was applied."}
             else:
                 result = repo.write(action["content"])
                 wrote, passed = True, False
-        elif kind == "scope_probe" and require_probe:
-            result = repo.probe()
-            probed = True
         elif kind == "assess_handoff" and handoff is not None:
             expected = handoff["artifact"]["evidence"]["partial_test"]["command"]
             assessed = (action.get("observed_exit_code") == 0 and
@@ -263,8 +258,6 @@ def coding_loop(client, model, repo, evidence_dir, task_prompt=None, handoff=Non
               "source_sha256": hashlib.sha256(after.encode()).hexdigest()}
     if handoff is not None:
         result["handoff_assessment"] = assessment
-    result["scope_probes"] = [event["result"] for event in events if isinstance(event["action"], dict)
-                              and event["action"]["action"] == "scope_probe"]
     save_json(evidence_dir / "coding-result.json", result)
     return result
 

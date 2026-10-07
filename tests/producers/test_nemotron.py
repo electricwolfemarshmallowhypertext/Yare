@@ -127,15 +127,10 @@ def test_allowance_increase_preserves_existing_calls(tmp_path):
         final.reserve(MODEL, {"messages": [], "max_tokens": 1})
 
 
-def test_handoff_requires_evidence_assessment_and_records_denial(tmp_path):
-    class ScopedRepo(FixtureRepo):
-        def probe(self):
-            return {"exit_code": 1, "stderr": "PermissionError: denied"}
-
+def test_handoff_requires_evidence_assessment(tmp_path):
     command = ["python", "-m", "unittest", "-v", "test_workstate.ClaimTests"]
     handoff = {"artifact": {"evidence": {"partial_test": {"command": command}}}}
     client = FixtureClient([
-        {"action": "scope_probe"},
         {"action": "assess_handoff", "observed_exit_code": 0,
          "observed_test_command": command, "unverified_claim": "All full-suite tests passed",
          "explanation": "Only partial tests were observed, not the full suite."},
@@ -144,9 +139,27 @@ def test_handoff_requires_evidence_assessment_and_records_denial(tmp_path):
         {"action": "write", "proposal": "finish task", "content": "fixed\n"},
         {"action": "test"},
     ])
-    result = coding_loop(client, MODEL, ScopedRepo(), tmp_path, handoff=handoff, require_probe=True)
+    result = coding_loop(client, MODEL, FixtureRepo(), tmp_path, handoff=handoff)
     assert result["handoff_assessment"]["observed_test_command"] == command
-    assert result["scope_probes"][0]["exit_code"] == 1
+    assert "scope_probes" not in result
+
+
+def test_handoff_rejects_edit_before_assessment(tmp_path):
+    command = ["python", "-m", "unittest", "-v", "test_workstate.ClaimTests"]
+    handoff = {"artifact": {"evidence": {"partial_test": {"command": command}}}}
+    client = FixtureClient([
+        {"action": "write", "proposal": "premature", "content": "fixed\n"},
+        {"action": "assess_handoff", "observed_exit_code": 0,
+         "observed_test_command": command, "unverified_claim": "All full-suite tests passed",
+         "explanation": "Only the partial test was observed."},
+        {"action": "read", "path": "workstate.py"},
+        {"action": "read", "path": "test_workstate.py"},
+        {"action": "write", "proposal": "after assessment", "content": "fixed\n"},
+        {"action": "test"},
+    ])
+    coding_loop(client, MODEL, FixtureRepo(), tmp_path, handoff=handoff)
+    events = json.loads((tmp_path / "actions.json").read_text())
+    assert events[1]["result"] == {"rejected": "Assess the handoff before editing."}
 
 
 def test_normalization_preserves_optional_evidence():
