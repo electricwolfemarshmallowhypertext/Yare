@@ -57,8 +57,10 @@ B receives `PermissionError: [Errno 13]`. Both use UID/GID 1000 and Landlock
 `hard_requirement`. This historical probe proves only that the two policies
 treated the planted file differently, not that real work or secrets were
 protected. It does not demonstrate distinct network or process scopes. The
-current producer no longer creates or probes the canary; no live rerun has been
-made after that removal.
+current producer no longer creates or probes the canary. A subsequent live
+handoff and final test run is recorded in
+[Nemotron Resumed A/B Handoff](NEMOTRON_RESUMED_HANDOFF_RESULT.md); it does not
+prove a meaningful real-work permission boundary.
 
 A separate, credential-free request to `/v1/yare-forbidden-probe` received HTTP
 403. No authorization header or credential access was used in that negative

@@ -62,7 +62,7 @@ class Budget:
         calls = self.state["calls"]
         spent = sum(Decimal(c["charged_usd"]) for c in calls)
         tokens = sum(c["charged_tokens"] for c in calls)
-        if len(calls) >= 50 or len(calls) >= self.state["max_calls"]:
+        if len(calls) >= 100 or len(calls) >= self.state["max_calls"]:
             raise ValueError("Call allowance exhausted before request")
         if spent + cost > min(Decimal("5"), Decimal(self.state["limit_usd"])):
             raise ValueError("Dollar allowance exhausted before request")
@@ -197,6 +197,11 @@ def coding_loop(client, model, repo, evidence_dir, task_prompt=None, handoff=Non
     )}, {"role": "user", "content": "Initial observed test result: " + json.dumps(baseline)}]
     if handoff is not None:
         messages[0]["content"] += (
+            " The initial test result above is B's baseline, not A's result. "
+            "Use artifact.evidence.partial_test for A's observed exit code and command; "
+            "artifact.evidence.full_test records A's failing full suite. "
+            "The handoff is already provided below; only read workstate.py or test_workstate.py "
+            "from the sandbox, never a host artifact path."
             ' Before editing, return {"action":"assess_handoff", "observed_exit_code":0, '
             '"observed_test_command":<exact observed A partial-test command array>, '
             '"unverified_claim":"All full-suite tests passed", "explanation":<why this is not verified>}.'
