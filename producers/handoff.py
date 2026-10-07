@@ -17,8 +17,10 @@ TASK = "Evidence-based claim classification with case and whitespace normalizati
 
 
 class HandoffRepo(OpenShellRepo):
+    probe_path = "/tmp/a-notes/probe.txt"
+
     def probe(self):
-        return self.execute("python", "-c", "from pathlib import Path; print(Path('/tmp/a-notes/probe.txt').read_text())")
+        return self.execute("python", "-c", "from pathlib import Path; print(Path(" + repr(self.probe_path) + ").read_text())")
 
 
 def load_handoff(database_url, run_id):
@@ -66,6 +68,8 @@ def main():
     parser.add_argument("--phase", choices=["a", "b"], required=True)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--sandbox", required=True)
+    parser.add_argument("--routed", action="store_true", help="Call Token Factory through OpenShell provider access")
+    parser.add_argument("--stop-on-refresh", action="store_true", help="Stop routed inference if OpenShell refreshes again")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     settings = read_settings(root / ".env.nebius")
@@ -74,10 +78,15 @@ def main():
     os.environ.pop("YARE_S3_BUCKET", None)
     budget = Budget(root / ".tmp/nebius-first-test/budget.json")
     evidence_dir = root / ".tmp/handoff" / args.run_id / args.phase
-    client = TokenFactory(settings["NEBIUS_API_KEY"], budget, evidence_dir)
-    models = client.models([settings["NEBIUS_MODEL_ID"], settings["NEBIUS_EXPLAIN_MODEL_ID"]])
     target = "test_workstate.ClaimTests" if args.phase == "a" else "test_workstate"
     repo = HandoffRepo(root, args.sandbox, target)
+    if args.routed:
+        repo.probe_path = "/opt/yare-a-notes/probe.txt"
+        from producers.routing import RoutedTokenFactory
+        client = RoutedTokenFactory(repo, budget, evidence_dir, stop_on_refresh=args.stop_on_refresh)
+    else:
+        client = TokenFactory(settings["NEBIUS_API_KEY"], budget, evidence_dir)
+    models = client.models([settings["NEBIUS_MODEL_ID"], settings["NEBIUS_EXPLAIN_MODEL_ID"]])
     loaded = None
     if args.phase == "b":
         loaded = load_handoff(settings["YARE_DATABASE_URL"], args.run_id + "-a")
@@ -106,9 +115,11 @@ def main():
         raise ValueError("B full suite did not pass")
     source = repo.read("workstate.py")
     phase = args.phase.upper()
-    policy = root / "examples/nemotron-handoff" / f"agent-{args.phase}.yaml"
+    policy_suffix = "-routed" if args.routed else ""
+    policy = root / "examples/nemotron-handoff" / f"agent-{args.phase}{policy_suffix}.yaml"
     artifact = make_artifact(args.run_id + "-" + args.phase, phase, result, source, full_test,
                              hashlib.sha256(policy.read_bytes()).hexdigest())
+    artifact["evidence"]["inference_transport"] = "OpenShell endpoint-bound provider" if args.routed else "host controller"
     artifact_path = evidence_dir / "lead-artifact.json"
     save_json(artifact_path, artifact)
     packet, _, _, receipt_path, receipt, _ = compile_lead_state(root, TASK, [artifact_path], validate_artifacts=True)
