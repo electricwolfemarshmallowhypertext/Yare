@@ -108,20 +108,24 @@ def test_loop_requires_inspection_before_edit(tmp_path):
 
 def test_allowance_increase_preserves_existing_calls(tmp_path):
     path = tmp_path / "budget.json"
-    for _ in range(9):
+    initial = Budget(path)
+    initial.state["max_calls"] = 50
+    save_json(path, initial.state)
+    for _ in range(45):
         initial = Budget(path)
         index = initial.reserve(MODEL, {"messages": [], "max_tokens": 1})
         initial.settle(index, {"prompt_tokens": 10, "completion_tokens": 1})
     budget = Budget(path)
     original = list(budget.state["calls"])
-    budget.state["max_calls"] = 50
+    budget.state["max_calls"] = 100
     save_json(path, budget.state)
-    for _ in range(41):
+    for _ in range(55):
         current = Budget(path)
         index = current.reserve(MODEL, {"messages": [], "max_tokens": 1})
         current.settle(index, {"prompt_tokens": 10, "completion_tokens": 1})
     final = Budget(path)
-    assert final.state["calls"][:9] == original
+    assert final.state["calls"][:45] == original
+    assert final.state["max_calls"] == 100
     assert final.state["limit_usd"] == "5"
     with pytest.raises(ValueError, match="Call allowance"):
         final.reserve(MODEL, {"messages": [], "max_tokens": 1})
@@ -130,7 +134,12 @@ def test_allowance_increase_preserves_existing_calls(tmp_path):
 def test_handoff_requires_evidence_assessment(tmp_path):
     command = ["python", "-m", "unittest", "-v", "test_workstate.ClaimTests"]
     handoff = {"artifact": {"evidence": {"partial_test": {"command": command}}}}
-    client = FixtureClient([
+    class CapturingClient(FixtureClient):
+        def complete(self, model, messages):
+            self.first_messages = getattr(self, "first_messages", messages)
+            return super().complete(model, messages)
+
+    client = CapturingClient([
         {"action": "assess_handoff", "observed_exit_code": 0,
          "observed_test_command": command, "unverified_claim": "All full-suite tests passed",
          "explanation": "Only partial tests were observed, not the full suite."},
@@ -141,6 +150,8 @@ def test_handoff_requires_evidence_assessment(tmp_path):
     ])
     result = coding_loop(client, MODEL, FixtureRepo(), tmp_path, handoff=handoff)
     assert result["handoff_assessment"]["observed_test_command"] == command
+    assert "B's baseline, not A's result" in client.first_messages[0]["content"]
+    assert "only read workstate.py or test_workstate.py" in client.first_messages[0]["content"]
     assert "scope_probes" not in result
 
 
