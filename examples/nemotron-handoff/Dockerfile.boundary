@@ -1,0 +1,9 @@
+FROM python:3.12-slim
+RUN mkdir -p /tmp/yare-task/nemotron-task /opt/yare-original-checkout && \
+    chown -R 1000:1000 /tmp/yare-task
+COPY workstate.py test_workstate.py /opt/yare-original-checkout/
+COPY workstate.py test_workstate.py /tmp/yare-task/nemotron-task/
+RUN chown -R 1000:1000 /tmp/yare-task && \
+    chmod 755 /opt/yare-original-checkout && \
+    chmod 644 /opt/yare-original-checkout/workstate.py /opt/yare-original-checkout/test_workstate.py
+WORKDIR /tmp/yare-task/nemotron-task

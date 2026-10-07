@@ -1449,7 +1449,12 @@ def _lead_current_state_markdown(packet: dict[str, Any]) -> str:
     return "\n".join(md).rstrip() + "\n"
 
 
-def _lead_write_receipt(root: Path, packet: dict[str, Any], command_run: str) -> tuple[Path, dict[str, Any]]:
+def _lead_write_receipt(
+    root: Path,
+    packet: dict[str, Any],
+    command_run: str,
+    receipt_evidence: dict[str, Any] | None = None,
+) -> tuple[Path, dict[str, Any]]:
     proof = packet.get("proof", {})
     git_state = proof.get("git_state", {})
     timestamp = datetime.now(timezone.utc)
@@ -1471,6 +1476,8 @@ def _lead_write_receipt(root: Path, packet: dict[str, Any], command_run: str) ->
         "validation_ok": (packet.get("validation") or {}).get("ok"),
         "validation_errors": (packet.get("validation") or {}).get("errors", []),
     }
+    if receipt_evidence is not None:
+        receipt["access_evidence"] = receipt_evidence
     material = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode("utf-8")
     receipt["receipt_hash"] = hashlib.sha256(material).hexdigest()
 
@@ -1487,6 +1494,7 @@ def compile_lead_state(
     task_override: str | None,
     artifact_paths: list[Path],
     validate_artifacts: bool = False,
+    receipt_evidence: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], Path, Path, Path, dict[str, Any], list[str]]:
     artifacts: list[dict[str, Any]] = []
     warnings: list[str] = []
@@ -1527,7 +1535,8 @@ def compile_lead_state(
     json_path.write_text(json.dumps(packet, indent=2), encoding="utf-8")
     md_path.write_text(_lead_current_state_markdown(packet), encoding="utf-8")
 
-    receipt_path, receipt = _lead_write_receipt(root, packet, command_run="yare lead compile")
+    receipt_path, receipt = _lead_write_receipt(
+        root, packet, command_run="yare lead compile", receipt_evidence=receipt_evidence)
     storage_backend.persist_lead_compile(packet=packet, artifacts=artifacts, receipt=receipt)
     s3_uris = archive_backend.archive_lead_compile(
         packet=packet,
