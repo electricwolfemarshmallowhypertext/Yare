@@ -9,6 +9,7 @@ __pycache__/
 secrets/
 receipts/*.jsonl
 site.txt
+/ACTIVE_TODO.md
 .yare/
 .yare/resolved-context.json
 node_modules/
