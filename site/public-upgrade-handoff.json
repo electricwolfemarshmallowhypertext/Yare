@@ -1,0 +1,19 @@
+{
+  "task": "Evidence-based claim classification with case and whitespace normalization",
+  "scope": "One isolated coding task, not a broad benchmark score",
+  "source_access": "A read the sandboxed task-source snapshot. OpenShell denied B access to that same snapshot; B continued from its separate working copy and Yare's stored handoff.",
+  "a": {
+    "run_id": "nebius-boundary-20261007-a",
+    "current_state_hash": "5e53bbe6a5cae1a2ac56b2b810a95bd287026bca568cb551dd9024c7b69e4a41",
+    "receipt_hash": "65258c13083e38c77dc1b3077b0e18f0041abb434d8aa1a65c98a21e434eab2e",
+    "result": "Four targeted tests passed; two tests in the full suite still failed.",
+    "next_action": "Fix the remaining normalization failures."
+  },
+  "b": {
+    "run_id": "nebius-boundary-20261007-b",
+    "current_state_hash": "b141e9a891c620a82d05b6cb3c5bf369fad3bd1d1a046664f9da7d0972490762",
+    "receipt_hash": "ce666bf4e2f546fb451408ade4c76ac0a43357dd1b51db146614010d0d67cee8",
+    "result": "Fresh B fixed the remaining failures and passed all six full-suite tests.",
+    "next_action": "Review the final code, tests, and receipts."
+  }
+}

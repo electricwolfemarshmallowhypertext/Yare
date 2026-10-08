@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Boogaloo&family=Inter:wght@300;400;600;700&family=Rubik+Mono+One&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body id="top">
   <nav class="site-nav" aria-label="Primary navigation">
@@ -49,7 +49,7 @@
       <div class="stop-card">
         <span class="label">YARE / 01 / 06</span>
         <h2>DURABLE WORK MEMORY</h2>
-        <p>Yare gives AI agents a clean handoff: what changed, what is true, what is unresolved, what needs human review, and what to do next.</p>
+        <p>A coding agent can leave a tested partial change in Yare. A fresh agent can continue from the stored handoff after the first sandbox ends.</p>
         <div class="marker"></div>
       </div>
     </div>
@@ -58,7 +58,7 @@
       <div class="stop-card">
         <span class="label">YARE / 02 / 06</span>
         <h2>WHAT CHANGED</h2>
-        <p>Yare records the files, artifacts, and work state touched by coding agents, scripts, CI jobs, and human engineers.</p>
+        <p>Yare saved A’s source, its hash, and actual test output before B began work.</p>
         <div class="marker"></div>
       </div>
     </div>
@@ -67,7 +67,7 @@
       <div class="stop-card">
         <span class="label">YARE / 03 / 06</span>
         <h2>WHAT IS TRUE</h2>
-        <p>Yare separates verified facts from agent claims so the next agent does not have to trust a chat summary.</p>
+        <p>In the recorded run, A passed four targeted tests but failed two full-suite tests. B distinguished those results before editing.</p>
         <div class="marker"></div>
       </div>
     </div>
@@ -76,7 +76,7 @@
       <div class="stop-card">
         <span class="label">YARE / 04 / 06</span>
         <h2>WHAT IS UNRESOLVED</h2>
-        <p>Yare keeps unverified claims, contradictions, open loops, and human approval items visible instead of burying them in logs.</p>
+        <p>Yare kept A’s unsupported ‘all tests passed’ claim unverified alongside the failing test output.</p>
         <div class="marker"></div>
       </div>
     </div>
@@ -85,7 +85,7 @@
       <div class="stop-card">
         <span class="label">YARE / 05 / 06</span>
         <h2>NEXT CLEAN ACTION</h2>
-        <p>Yare turns scattered AI work into one current-state handoff with the next action another agent or teammate can take.</p>
+        <p>Fresh B fixed the remaining failures and passed the full six-test suite.</p>
         <div class="marker"></div>
       </div>
     </div>
@@ -94,7 +94,7 @@
       <div class="stop-card">
         <span class="label">YARE / 06 / 06</span>
         <h2>PROOF</h2>
-        <p>Yare stores memory in CockroachDB, archives proof artifacts to S3, and lets Claude Code, Codex, and Cursor inspect the same state through CockroachDB Managed MCP.</p>
+        <p>Yare stores memory in CockroachDB, archives proof artifacts to S3, and lets Claude Code, Codex, and Cursor inspect the same state through CockroachDB Managed MCP. In one live Nebius Nemotron A/B run, both handoffs and receipts were stored in CockroachDB, and B finished with 6/6 tests passing.</p>
         <a class="hero-button proof-demo" href="/demo">Demo</a>
         <div class="marker"></div>
       </div>
@@ -105,7 +105,7 @@
 
   <section class="roach-proof">
     <div>
-      <img class="roach-logo" src="/assets/cockroachlabs.svg" alt="" aria-hidden="true">
+      <img class="roach-logo" src="assets/cockroachlabs.svg" alt="" aria-hidden="true">
       <span class="proof-eyebrow">BUILT ON COCKROACHDB</span>
       <p>Yare stores verified agent memory in <a href="https://www.cockroachlabs.com/" target="_blank" rel="noopener"><strong>CockroachDB</strong></a>, so the handoff survives tool switches, agent restarts, and messy multi-run work.</p>
     </div>
@@ -166,6 +166,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/MotionPathPlugin.min.js"></script>
-  <script src="/script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
