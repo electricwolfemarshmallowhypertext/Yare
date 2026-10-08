@@ -312,10 +312,12 @@ def artifact_for(run_id, phase, before, result, access):
                 "syntax_test": result["syntax_test"], "original_source_access": access,
                 "handoff_assessment": result["assessment"]}
     status = "passed" if observed["exit_code"] == 0 else "failed"
+    claim = f"Benchmark target {TARGET} {status} with observed exit code {observed['exit_code']}"
+    evidence["test_claim"] = {**observed, "kind": "test", "claim": claim,
+                              "expected_exit_code": observed["exit_code"]}
     return {"schema_version": "lead-artifact.v1", "run_id": run_id, "tool": "Nemotron-Nano-" + phase.upper(),
             "task": TASK, "timestamp": datetime.now(timezone.utc).isoformat(),
-            "claims": [{"claim": f"Benchmark target {TARGET} {status} with observed exit code {observed['exit_code']}",
-                        "verification_status": "verified"}],
+            "claims": [{"claim": claim, "verification_status": "verified", "evidence_ref": "test_claim"}],
             "decisions": ["Only observed test output counts as verification."],
             "files_touched": [SOURCE],
             "open_loops": ["Implement consider_mro=False and rerun benchmark tests"] if phase == "a" else [],

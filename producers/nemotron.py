@@ -5,8 +5,11 @@ import base64
 import difflib
 import hashlib
 import json
+import os
 import subprocess
 import time
+import uuid
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -48,7 +51,38 @@ class Budget:
             "limit_usd": "5", "max_calls": 12, "max_tokens": TOKEN_CAP, "calls": []
         }
 
+    @contextmanager
+    def locked(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor = os.open(str(self.path) + ".lock", os.O_RDWR | os.O_CREAT, 0o600)
+        try:
+            if os.name == "nt":
+                import msvcrt
+                if os.fstat(descriptor).st_size == 0:
+                    os.write(descriptor, b"0")
+                os.lseek(descriptor, 0, os.SEEK_SET)
+                msvcrt.locking(descriptor, msvcrt.LK_LOCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(descriptor, fcntl.LOCK_EX)
+            try:
+                if self.path.exists():
+                    self.state = json.loads(self.path.read_text())
+                yield
+            finally:
+                if os.name == "nt":
+                    os.lseek(descriptor, 0, os.SEEK_SET)
+                    msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(descriptor)
+
     def reserve(self, model, payload):
+        with self.locked():
+            return self._reserve(model, payload)
+
+    def _reserve(self, model, payload):
         if self.state.get("blocked"):
             raise ValueError("Budget ledger blocked pending usage review")
         if model not in RATES:
@@ -69,7 +103,7 @@ class Budget:
             raise ValueError("Dollar allowance exhausted before request")
         if tokens + input_bound + output_bound > min(TOKEN_CAP, self.state["max_tokens"]):
             raise ValueError("Token allowance exhausted before request")
-        calls.append({"model": model, "charged_usd": str(cost),
+        calls.append({"call_id": uuid.uuid4().hex, "model": model, "charged_usd": str(cost),
                       "charged_tokens": input_bound + output_bound,
                       "input_bound": input_bound, "output_bound": output_bound,
                       "status": "reserved"})
@@ -77,14 +111,22 @@ class Budget:
         return len(calls) - 1
 
     def settle(self, index, usage):
+        with self.locked():
+            return self._settle(index, usage)
+
+    def _settle(self, index, usage):
         call = self.state["calls"][index]
+        if call["status"] != "reserved":
+            raise ValueError("Call reservation already settled")
         prompt = usage.get("prompt_tokens")
         completion = usage.get("completion_tokens")
         if not isinstance(prompt, int) or not isinstance(completion, int) or min(prompt, completion) < 0:
-            self.halt("Missing valid usage")
+            self.state["blocked"] = "Missing valid usage"
+            save_json(self.path, self.state)
             raise ValueError("Missing valid usage; reservation retained, stopping")
         if prompt > call["input_bound"] or completion > call["output_bound"]:
-            self.halt("Provider exceeded reserved token bounds")
+            self.state["blocked"] = "Provider exceeded reserved token bounds"
+            save_json(self.path, self.state)
             raise ValueError("Provider exceeded reserved token bounds; stopping")
         input_rate, output_rate = RATES[call["model"]]
         call.update(charged_usd=str((prompt * input_rate + completion * output_rate) / 1000000),
@@ -92,8 +134,9 @@ class Budget:
         save_json(self.path, self.state)
 
     def halt(self, reason):
-        self.state["blocked"] = reason
-        save_json(self.path, self.state)
+        with self.locked():
+            self.state["blocked"] = reason
+            save_json(self.path, self.state)
 
 
 class TokenFactory:

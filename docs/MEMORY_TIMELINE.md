@@ -8,7 +8,10 @@ The memory timeline reads CockroachDB-backed current-state records and prints a 
 
 ```powershell
 python -m cli.yare memory timeline
+python -m cli.yare memory timeline --task "your task" --limit 25
 ```
+
+The limit selects the newest states; they are displayed from earlier to later. The task filter keeps one task's history together.
 
 Each timeline entry shows:
 
@@ -28,9 +31,10 @@ Each timeline entry shows:
 
 ```powershell
 python -m cli.yare memory diff --latest
+python -m cli.yare memory diff --latest --task "your task"
 ```
 
-The diff compares the latest current state to the previous current state and shows:
+The diff compares the newest two states of the selected task. Without a task filter, it uses the latest state's task. It shows:
 
 - previous state hash
 - latest state hash
@@ -39,10 +43,13 @@ The diff compares the latest current state to the previous current state and sho
 - still unresolved claims
 - new unresolved claims
 - resolved claims
+- removed claims
 - new contradictions
 - cleared contradictions
 - new approval items
 - whether the next clean action changed
+
+A claim is resolved only when the later state contains a supported fact or a recorded human approval for that claim. A claim that merely disappears is removed, not resolved.
 
 ## Requirements
 

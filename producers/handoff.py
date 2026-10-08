@@ -12,6 +12,7 @@ from pathlib import Path
 import psycopg
 
 from cli.yare import compile_lead_state
+from cli.storage import _hash_json
 from producers.nemotron import Budget, OpenShellRepo, TokenFactory, coding_loop, read_settings, save_json
 
 TASK = "Evidence-based claim classification with case and whitespace normalization"
@@ -47,20 +48,43 @@ def capture_original_source_access(repo, source_path, phase):
 def load_handoff(database_url, run_id):
     with psycopg.connect(database_url, connect_timeout=15) as connection:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT current_state_hash, state_json FROM yare_current_states "
-                           "WHERE run_id = %s ORDER BY created_at DESC LIMIT 1", (run_id,))
-            state = cursor.fetchone()
-            cursor.execute("SELECT artifact_json FROM yare_lead_artifacts WHERE run_id = %s "
-                           "ORDER BY created_at DESC LIMIT 1", (run_id,))
-            artifact = cursor.fetchone()
-            cursor.execute("SELECT receipt_hash FROM yare_receipts WHERE run_id = %s "
-                           "AND current_state_hash = %s ORDER BY created_at DESC LIMIT 1",
-                           (run_id, state[0] if state else ""))
-            receipt = cursor.fetchone()
-    if not state or not artifact or not receipt:
+            cursor.execute("""
+                SELECT cs.current_state_hash, cs.state_json,
+                       COALESCE(cs.packet_json, CASE WHEN r.current_state_hash = cs.current_state_hash
+                           THEN r.compiled_state_json END), rec.receipt_hash, rec.receipt_json
+                FROM yare_current_states cs
+                JOIN yare_runs r ON r.run_id = cs.run_id
+                JOIN yare_receipts rec ON rec.run_id = cs.run_id
+                    AND rec.current_state_hash = cs.current_state_hash
+                WHERE cs.run_id = %s
+                ORDER BY cs.created_at DESC, cs.current_state_hash DESC, rec.created_at DESC
+                LIMIT 1
+            """, (run_id,))
+            row = cursor.fetchone()
+    if not row or not isinstance(row[2], dict):
         raise ValueError("Durable handoff rows missing")
-    return {"run_id": run_id, "current_state_hash": state[0], "current_state": state[1],
-            "artifact": artifact[0], "receipt_hash": receipt[0]}
+    state_hash, state, packet, receipt_hash, receipt = row
+    material = {key: value for key, value in packet.items() if key != "deterministic_hash"}
+    if packet.get("deterministic_hash") != state_hash or _hash_json(material) != state_hash:
+        raise ValueError("Stored handoff state hash mismatch")
+    if packet.get("current_state") != state:
+        raise ValueError("Stored handoff state content mismatch")
+    if not isinstance(receipt, dict) or receipt.get("receipt_hash") != receipt_hash:
+        raise ValueError("Stored handoff receipt missing")
+    receipt_material = {key: value for key, value in receipt.items() if key != "receipt_hash"}
+    if (_hash_json(receipt_material) != receipt_hash or
+            receipt.get("current_state_hash") != state_hash or receipt.get("run_id") != run_id):
+        raise ValueError("Stored handoff receipt hash mismatch")
+    artifacts = [item for item in packet.get("artifacts", []) if item.get("run_id") == run_id]
+    if len(artifacts) != 1:
+        raise ValueError("Stored handoff source artifact is ambiguous or missing")
+    artifact = artifacts[0]
+    evidence = artifact.get("evidence", {})
+    source = evidence.get("source_code")
+    if not isinstance(source, str) or hashlib.sha256(source.encode()).hexdigest() != evidence.get("source_sha256"):
+        raise ValueError("Stored handoff source hash mismatch")
+    return {"run_id": run_id, "current_state_hash": state_hash, "current_state": state,
+            "artifact": artifact, "receipt_hash": receipt_hash}
 
 
 def make_artifact(run_id, phase, result, source, full_test, policy_hash):
@@ -69,8 +93,11 @@ def make_artifact(run_id, phase, result, source, full_test, policy_hash):
                 "source_sha256": hashlib.sha256(source.encode()).hexdigest(),
                 "policy_sha256": policy_hash,
                 "handoff_assessment": result.get("handoff_assessment")}
-    claims = [{"claim": f"Agent {phase} observed test command {json.dumps(result['final_test']['command'])} "
-               "passed with exit code 0", "verification_status": "verified"}]
+    claim = (f"Agent {phase} observed test command {json.dumps(result['final_test']['command'])} "
+             "passed with exit code 0")
+    evidence["test_claim"] = {**result["final_test"], "kind": "test", "claim": claim,
+                              "expected_exit_code": 0}
+    claims = [{"claim": claim, "verification_status": "verified", "evidence_ref": "test_claim"}]
     if phase == "A":
         claims.append({"claim": "All full-suite tests passed", "verification_status": "unverified"})
         evidence["challenge_note"] = "Deliberately seeded unsupported claim for the handoff integrity test."

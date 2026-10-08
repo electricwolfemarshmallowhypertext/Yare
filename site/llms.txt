@@ -7,7 +7,8 @@ It gives agents and humans a clean handoff: what changed, what is true, what is 
 ## Primary links
 
 - Site: https://yare-vert.vercel.app/
-- Use cases: https://yare-vert.vercel.app/use-cases.html
+- Use cases: https://yare-vert.vercel.app/use-cases/
+- Read-only A/B demo: https://yare-vert.vercel.app/demo
 - Proof bench: https://yare-vert.vercel.app/proof
 - GitHub: https://github.com/electricwolfemarshmallowhypertext/Yare
 - License: https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/LICENSE
