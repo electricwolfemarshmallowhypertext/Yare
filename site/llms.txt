@@ -27,14 +27,14 @@ It gives agents and humans a clean handoff: what changed, what is true, what is 
 
 - AI coding teams
 - Engineering audit
-- Compliance teams
-- Vibe coders
-- Content and research operators
-- Devtool founders and AI agencies
-- Technical docs teams
-- Product teams writing specs with AI
-- Support and customer ops teams using agents
-- Long-form writers using AI
+- Contradiction and approval review
+- Restart after a partial run
+- Cross-tool memory read
+- State change review
+- Search prior memory
+- Archive proof artifacts
+- Local handoff export
+- Sandbox access evidence
 
 ## Contact
 
