@@ -1,0 +1,2 @@
+FROM yare-nemotron-boundary:local
+RUN chmod 1777 /tmp/yare-task/nemotron-task

@@ -1,4 +1,5 @@
 const { Pool } = require("pg");
+const publishedHandoff = require("../public-handoff.json");
 
 let pool;
 
@@ -35,6 +36,14 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  if (!/^[a-f0-9]{64}$/.test(publishedHandoff.current_state_hash || "") ||
+      typeof publishedHandoff.run_id !== "string" || !publishedHandoff.run_id) {
+    res.statusCode = 503;
+    res.setHeader("content-type", "text/plain; charset=utf-8");
+    res.end("no public handoff configured");
+    return;
+  }
+
   let db;
   try {
     db = getPool();
@@ -63,14 +72,15 @@ module.exports = async function handler(req, res) {
         ORDER BY created_at DESC
         LIMIT 1
       ) yr ON true
+      WHERE cs.current_state_hash = $1 AND cs.run_id = $2
       ORDER BY cs.created_at DESC
       LIMIT 1
-    `);
+    `, [publishedHandoff.current_state_hash, publishedHandoff.run_id]);
 
     if (result.rows.length === 0) {
       res.statusCode = 404;
       res.setHeader("content-type", "text/plain; charset=utf-8");
-      res.end("no handoff records found");
+      res.end("published handoff not found");
       return;
     }
 
