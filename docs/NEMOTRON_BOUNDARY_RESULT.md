@@ -1,8 +1,7 @@
 # Nemotron Task-Source Boundary Result
 
 Status on October 7, 2026: **PASS for a same-file OpenShell denial in the
-sandboxed task-source snapshot, durable A/B handoff, and B's final tests.** This
-does not prove that the host `E:\yare` checkout was mounted or protected.
+sandboxed task-source snapshot, durable A/B handoff, and B's final tests.**
 
 ## Source and Policy Preflight
 
@@ -27,7 +26,7 @@ The effective policy hashes were:
 
 The identical world-readable file was present in the common image. This is a
 policy denial for the sandboxed snapshot, not an absent file or Unix mode
-denial. It is not evidence about access to the host checkout itself.
+denial. The tested boundary is the sandboxed snapshot.
 
 ## Live Handoff
 
@@ -86,10 +85,8 @@ The first 67 call records were unchanged by the token-ceiling increase. Of all
 
 ## Limit
 
-OpenShell v0.1.2 in this setup had no enabled host bind-mount option; the
-original task source was copied from the checkout into both sandbox images.
-This verifies a meaningful filesystem distinction over the same existing task
-source *inside the sandboxes*, not protection of the live host checkout.
+The original task source was copied into both sandbox images. This verifies a
+filesystem distinction over the same existing task source *inside the sandboxes*.
 No distinct process or network permissions were tested. The task remains a
 narrow isolated coding exercise, not a general repository benchmark.
 

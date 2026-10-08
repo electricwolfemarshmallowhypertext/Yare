@@ -168,18 +168,18 @@ docker build -t yare-nemotron-routed:local -f examples/nemotron-handoff/Dockerfi
 create-only; do not blindly rerun it against an existing profile/provider.
 
 Commands for the historical live routed attempt. Rebuilding the current images
-does not recreate the canary or its permission result:
+does not recreate the canary or its permission result. The local repository path is redacted as `<repo-root>`:
 
 ```powershell
-wsl -d Ubuntu -- env XDG_CONFIG_HOME=/mnt/e/yare/.tmp/openshell-v0.1.2/config /mnt/e/yare/.tmp/openshell-v0.1.2/openshell -g yare sandbox create --name yare-route-a --from yare-nemotron-routed:local --policy /mnt/e/yare/examples/nemotron-handoff/agent-a-routed.yaml --provider yare-nebius-tokenfactory --detach -- python -c 'import time; time.sleep(3600)'
+wsl -d Ubuntu -- env XDG_CONFIG_HOME=<repo-root>/.tmp/openshell-v0.1.2/config <repo-root>/.tmp/openshell-v0.1.2/openshell -g yare sandbox create --name yare-route-a --from yare-nemotron-routed:local --policy <repo-root>/examples/nemotron-handoff/agent-a-routed.yaml --provider yare-nebius-tokenfactory --detach -- python -c 'import time; time.sleep(3600)'
 python -m producers.routing models --sandbox yare-route-a
 python -m producers.handoff --phase a --run-id nebius-routed-20261007 --sandbox yare-route-a --routed
-wsl -d Ubuntu -- env XDG_CONFIG_HOME=/mnt/e/yare/.tmp/openshell-v0.1.2/config /mnt/e/yare/.tmp/openshell-v0.1.2/openshell -g yare sandbox stop yare-route-a
-wsl -d Ubuntu -- env XDG_CONFIG_HOME=/mnt/e/yare/.tmp/openshell-v0.1.2/config /mnt/e/yare/.tmp/openshell-v0.1.2/openshell -g yare sandbox delete yare-route-a
-wsl -d Ubuntu -- env XDG_CONFIG_HOME=/mnt/e/yare/.tmp/openshell-v0.1.2/config /mnt/e/yare/.tmp/openshell-v0.1.2/openshell -g yare sandbox list
-wsl -d Ubuntu -- env XDG_CONFIG_HOME=/mnt/e/yare/.tmp/openshell-v0.1.2/config /mnt/e/yare/.tmp/openshell-v0.1.2/openshell -g yare sandbox create --name yare-route-b --from yare-nemotron-routed:local --policy /mnt/e/yare/examples/nemotron-handoff/agent-b-routed.yaml --provider yare-nebius-tokenfactory --detach -- python -c 'import time; time.sleep(3600)'
+wsl -d Ubuntu -- env XDG_CONFIG_HOME=<repo-root>/.tmp/openshell-v0.1.2/config <repo-root>/.tmp/openshell-v0.1.2/openshell -g yare sandbox stop yare-route-a
+wsl -d Ubuntu -- env XDG_CONFIG_HOME=<repo-root>/.tmp/openshell-v0.1.2/config <repo-root>/.tmp/openshell-v0.1.2/openshell -g yare sandbox delete yare-route-a
+wsl -d Ubuntu -- env XDG_CONFIG_HOME=<repo-root>/.tmp/openshell-v0.1.2/config <repo-root>/.tmp/openshell-v0.1.2/openshell -g yare sandbox list
+wsl -d Ubuntu -- env XDG_CONFIG_HOME=<repo-root>/.tmp/openshell-v0.1.2/config <repo-root>/.tmp/openshell-v0.1.2/openshell -g yare sandbox create --name yare-route-b --from yare-nemotron-routed:local --policy <repo-root>/examples/nemotron-handoff/agent-b-routed.yaml --provider yare-nebius-tokenfactory --detach -- python -c 'import time; time.sleep(3600)'
 python -m producers.handoff --phase b --run-id nebius-routed-20261007 --sandbox yare-route-b --routed
-wsl -d Ubuntu -- env XDG_CONFIG_HOME=/mnt/e/yare/.tmp/openshell-v0.1.2/config /mnt/e/yare/.tmp/openshell-v0.1.2/openshell -g yare sandbox provider status yare-route-b yare-nebius-tokenfactory --output json
+wsl -d Ubuntu -- env XDG_CONFIG_HOME=<repo-root>/.tmp/openshell-v0.1.2/config <repo-root>/.tmp/openshell-v0.1.2/openshell -g yare sandbox provider status yare-route-b yare-nebius-tokenfactory --output json
 ```
 
 The first B command failed during startup refresh. After investigating, retaining

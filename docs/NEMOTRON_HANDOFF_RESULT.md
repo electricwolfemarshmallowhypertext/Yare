@@ -124,16 +124,16 @@ with `NEBIUS_API_KEY`, `NEBIUS_MODEL_ID`, `NEBIUS_EXPLAIN_MODEL_ID`, and
 `YARE_DATABASE_URL`. Never print or commit it. Use a new run ID for each rerun;
 do not reset the shared budget ledger. These commands document the historical
 run; rebuilding the current image no longer creates the canary or tests its
-permission result.
+permission result. The local repository path in these commands is redacted as `<repo-root>`.
 
 ```powershell
 docker build -t yare-nemotron-handoff:local examples/nemotron-handoff
-wsl -d Ubuntu -- env XDG_CONFIG_HOME=/mnt/e/yare/.tmp/openshell-v0.1.2/config /mnt/e/yare/.tmp/openshell-v0.1.2/openshell -g yare sandbox create --name yare-agent-a --from yare-nemotron-handoff:local --policy /mnt/e/yare/examples/nemotron-handoff/agent-a.yaml --detach -- python -c 'import time; time.sleep(3600)'
+wsl -d Ubuntu -- env XDG_CONFIG_HOME=<repo-root>/.tmp/openshell-v0.1.2/config <repo-root>/.tmp/openshell-v0.1.2/openshell -g yare sandbox create --name yare-agent-a --from yare-nemotron-handoff:local --policy <repo-root>/examples/nemotron-handoff/agent-a.yaml --detach -- python -c 'import time; time.sleep(3600)'
 python -m producers.handoff --phase a --run-id nebius-ab-20261007 --sandbox yare-agent-a
-wsl -d Ubuntu -- env XDG_CONFIG_HOME=/mnt/e/yare/.tmp/openshell-v0.1.2/config /mnt/e/yare/.tmp/openshell-v0.1.2/openshell -g yare sandbox stop yare-agent-a
-wsl -d Ubuntu -- env XDG_CONFIG_HOME=/mnt/e/yare/.tmp/openshell-v0.1.2/config /mnt/e/yare/.tmp/openshell-v0.1.2/openshell -g yare sandbox delete yare-agent-a
-wsl -d Ubuntu -- env XDG_CONFIG_HOME=/mnt/e/yare/.tmp/openshell-v0.1.2/config /mnt/e/yare/.tmp/openshell-v0.1.2/openshell -g yare sandbox list
-wsl -d Ubuntu -- env XDG_CONFIG_HOME=/mnt/e/yare/.tmp/openshell-v0.1.2/config /mnt/e/yare/.tmp/openshell-v0.1.2/openshell -g yare sandbox create --name yare-agent-b --from yare-nemotron-handoff:local --policy /mnt/e/yare/examples/nemotron-handoff/agent-b.yaml --detach -- python -c 'import time; time.sleep(3600)'
+wsl -d Ubuntu -- env XDG_CONFIG_HOME=<repo-root>/.tmp/openshell-v0.1.2/config <repo-root>/.tmp/openshell-v0.1.2/openshell -g yare sandbox stop yare-agent-a
+wsl -d Ubuntu -- env XDG_CONFIG_HOME=<repo-root>/.tmp/openshell-v0.1.2/config <repo-root>/.tmp/openshell-v0.1.2/openshell -g yare sandbox delete yare-agent-a
+wsl -d Ubuntu -- env XDG_CONFIG_HOME=<repo-root>/.tmp/openshell-v0.1.2/config <repo-root>/.tmp/openshell-v0.1.2/openshell -g yare sandbox list
+wsl -d Ubuntu -- env XDG_CONFIG_HOME=<repo-root>/.tmp/openshell-v0.1.2/config <repo-root>/.tmp/openshell-v0.1.2/openshell -g yare sandbox create --name yare-agent-b --from yare-nemotron-handoff:local --policy <repo-root>/examples/nemotron-handoff/agent-b.yaml --detach -- python -c 'import time; time.sleep(3600)'
 python -m producers.handoff --phase b --run-id nebius-ab-20261007 --sandbox yare-agent-b
 ```
 

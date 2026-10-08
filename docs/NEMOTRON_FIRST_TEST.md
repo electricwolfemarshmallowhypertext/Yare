@@ -106,13 +106,13 @@ Privately populate the ignored `.env.nebius` with `NEBIUS_API_KEY`,
 `NEBIUS_MODEL_ID`, `NEBIUS_EXPLAIN_MODEL_ID`, and `YARE_DATABASE_URL`.
 Do not commit this file.
 
-Exact commands used after gateway setup:
+Commands used after gateway setup; the local repository path is redacted as `<repo-root>`:
 
 ```powershell
 python -m pytest -q tests/producers/test_nemotron.py tests/yare/test_yare_cli.py
 python -m py_compile producers/nemotron.py
-wsl -d Ubuntu -- env XDG_CONFIG_HOME=/mnt/e/yare/.tmp/openshell-v0.1.2/config /mnt/e/yare/.tmp/openshell-v0.1.2/openshell -g yare sandbox create --name yare-nemotron-first --from python:3.12-slim --detach -- python -c 'import time; time.sleep(3600)'
-wsl -d Ubuntu -- env XDG_CONFIG_HOME=/mnt/e/yare/.tmp/openshell-v0.1.2/config /mnt/e/yare/.tmp/openshell-v0.1.2/openshell -g yare sandbox upload yare-nemotron-first /mnt/e/yare/examples/nemotron-task /tmp/yare-task
+wsl -d Ubuntu -- env XDG_CONFIG_HOME=<repo-root>/.tmp/openshell-v0.1.2/config <repo-root>/.tmp/openshell-v0.1.2/openshell -g yare sandbox create --name yare-nemotron-first --from python:3.12-slim --detach -- python -c 'import time; time.sleep(3600)'
+wsl -d Ubuntu -- env XDG_CONFIG_HOME=<repo-root>/.tmp/openshell-v0.1.2/config <repo-root>/.tmp/openshell-v0.1.2/openshell -g yare sandbox upload yare-nemotron-first <repo-root>/examples/nemotron-task /tmp/yare-task
 python -m producers.nemotron --sandbox yare-nemotron-first
 ```
 
