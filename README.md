@@ -2,124 +2,75 @@
 
 **Shared work memory for AI agents.**
 
-Yare shows the next agent what happened, what changed, what is still unresolved, and what needs human review.
+## What
 
-Yare uses CockroachDB as a durable state ledger for agent work.
+Yare gives the next agent a clear handoff: what changed, what is verified, what remains unresolved, and what to do next.
 
-## Try It
+It stores work state in CockroachDB with receipts that people and agents can inspect. A separate coding producer uses NVIDIA Nemotron through Nebius Token Factory to edit code and run tests inside OpenShell sandboxes.
 
-- Live demo: https://yare-vert.vercel.app/demo
-- Project site: https://yare-vert.vercel.app/
-- Use cases: https://yare-vert.vercel.app/use-cases.html
+- [Try the read-only A/B demo](https://yare-vert.vercel.app/demo)
+- [Explore use cases](https://yare-vert.vercel.app/use-cases/)
+- [Visit the project site](https://yare-vert.vercel.app/)
 
-## Why It Exists
+## Why
 
-AI coding work gets scattered fast.
+AI coding work gets scattered across tools, conversations, code changes, and test logs. When another agent takes over, a summary alone can hide unfinished work or a failed test.
 
-Codex changes files. Claude explains something else. Cursor picks it up later. CI adds another signal. Then a human has to reconstruct the truth from chats, logs, diffs, and guesses.
+Yare keeps actual test results, unverified claims, contradictions, approval items, and the next action together. The handoff survives a restart or a switch to another agent.
 
-Yare gives the work one shared memory.
+In the recorded A/B coding run, A passed four targeted tests but left two failures in the full suite. Fresh B loaded A's handoff from CockroachDB, fixed the remaining failures, and passed all six tests. OpenShell also allowed A and denied B access to the same sandboxed source snapshot while B worked in its separate copy.
 
-## What It Does
+The public demo reads those completed records and their receipt hashes. [Read the recorded result](docs/NEMOTRON_BOUNDARY_RESULT.md).
 
-Yare turns agent work into a clear handoff:
-
-- what changed
-- what is true
-- what is unresolved
-- what contradicts
-- what needs review
-- what changed since the last run
-- what to do next
-
-## How It Works
+## How
 
 ```text
-AI/tool runs
-→ Lead Artifacts
-→ Yare compile
-→ CockroachDB memory
-→ vector search + timeline diff
-→ S3 archive
-→ next-agent handoff
+Agent code changes and test results
+-> Lead Artifacts
+-> Yare validation and compile
+-> CockroachDB work memory
+-> next-agent handoff
 ```
 
-CockroachDB stores the memory.
-S3 stores the artifacts.
-MCP lets agent clients inspect the same state.
+Yare remains model agnostic: it compiles work artifacts regardless of which tool produced them. CockroachDB stores the current state and history; vector search finds prior handoff sections, and timeline diffs show what changed. Managed MCP lets agent clients query the same memory. Optional S3 archiving preserves proof files, and local exports work without cloud credentials.
 
-## What Makes It Useful
-
-Yare does not just save notes.
-
-It keeps a durable work state, tracks how that state changes over time, supports semantic search across prior handoffs, and keeps receipts humans can review.
-
-## Verified With
-
-- CockroachDB durable memory
-- CockroachDB Distributed Vector Indexing
-- CockroachDB Managed MCP
-- Amazon S3 archive
-- Claude Code
-- Codex
-- Cursor
-- Vercel live demo
-
-Details are in `docs/`.
-
-## Quickstart
+Start locally:
 
 ```bash
-git clone https://github.com/electricwolfemarshmallowhypertext/Yare.git
+git clone --branch nebius-upgrade https://github.com/electricwolfemarshmallowhypertext/Yare.git
 cd Yare
 python -m pip install -r requirements-cli.txt
 python -m cli.yare doctor
 ```
 
-Run the demo compile:
+The `nebius-upgrade` branch contains the coding producer and A/B handoff described here. `main` preserves the earlier release.
+
+Compile the included artifacts into a local handoff:
 
 ```powershell
 .\scripts\demo-lead-compile.ps1
 ```
 
-Run the handoff demo:
-
-```powershell
-.\scripts\demo-real-use-case.ps1
-```
-
-## CockroachDB
-
-Set `YARE_DATABASE_URL` to store memory in CockroachDB:
+To persist and retrieve memory, configure CockroachDB:
 
 ```powershell
 $env:YARE_DATABASE_URL = "postgresql://USER:PASSWORD@HOST:26257/defaultdb?sslmode=verify-full"
 python -m cli.yare storage init
+.\scripts\demo-real-use-case.ps1
 ```
 
-## Core Commands
+Inspect stored memory:
 
 ```powershell
-python -m cli.yare storage init
-python -m cli.yare lead compile --task "compile ai work lead state" --artifact examples/lead-artifacts/run-codex.jsonl --artifact examples/lead-artifacts/run-claude.json --artifact examples/lead-artifacts/run-gemini.jsonl
 python -m cli.yare memory search --query "what still needs human review?" --limit 3
 python -m cli.yare memory timeline
 python -m cli.yare memory diff --latest
 ```
 
-## Use Cases
+Add `--task "your task"` to timeline or diff to inspect one task. Search combines vector distance with word and section matching, and removes duplicate results. Verified claims require linked test output or a recorded human review; disputed claims stay outside confirmed facts. A claim disappearing from a later state is reported as removed, not resolved.
 
-See `docs/use-cases/`.
+The coding producer requires Token Factory credentials and a configured OpenShell runtime. Its [integration documentation](docs/NEBIUS_PROVIDER_ROUTING.md) and [A/B run commands](docs/NEMOTRON_BOUNDARY_RESULT.md#live-handoff) describe the tested path. `yare run` prints launch instructions; the separate producer executes coding runs. Public paid execution is disabled.
 
-Start with:
+Further recorded checks: [CockroachDB](docs/COCKROACH_SMOKE_RESULT.md), [vector indexing](docs/VECTOR_SMOKE_RESULT.md), [timeline](docs/MEMORY_TIMELINE_RESULT.md), [S3](docs/S3_SMOKE_RESULT.md), and MCP reads from [Claude Code](docs/MCP_SMOKE_RESULT.md), [Codex](docs/CODEX_MCP_SMOKE_RESULT.md), and [Cursor](docs/CURSOR_MCP_SMOKE_RESULT.md).
 
-- AI coding teams
-- engineering audit
-- contradiction and approval review
-- restart after a partial run
-- cross-tool memory read
-- state change review
-
-## License
-
-MIT
+Yare is open source under the [MIT License](LICENSE).

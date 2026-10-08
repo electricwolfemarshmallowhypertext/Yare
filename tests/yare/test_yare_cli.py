@@ -984,7 +984,7 @@ def test_memory_search_uses_vector_distance_with_stubbed_connection() -> None:
 
     sql, params = calls[0]
     assert "ORDER BY embedding <=> %s::VECTOR" in sql
-    assert params[2] == 3
+    assert params[2] == 50
     assert rows == [
         {
             "section_name": "human approval items",

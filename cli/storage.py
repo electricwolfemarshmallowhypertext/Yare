@@ -43,9 +43,11 @@ SCHEMA_SQL = (
         current_state_hash TEXT PRIMARY KEY,
         run_id TEXT NOT NULL REFERENCES yare_runs (run_id) ON DELETE CASCADE,
         state_json JSONB NOT NULL,
+        packet_json JSONB,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
     """,
+    "ALTER TABLE yare_current_states ADD COLUMN IF NOT EXISTS packet_json JSONB",
     """
     CREATE TABLE IF NOT EXISTS yare_receipts (
         receipt_hash TEXT PRIMARY KEY,
@@ -91,6 +93,8 @@ TOKEN_SYNONYMS = {
     "claim": ("fact", "true", "unverified"),
     "claims": ("fact", "true", "unverified"),
 }
+SEARCH_STOP_WORDS = {"what", "is", "are", "the", "a", "an", "and", "or", "to", "for", "of",
+                     "in", "on", "still", "needs", "need", "does", "do", "which", "with", "me"}
 
 
 class StorageError(RuntimeError):
@@ -265,6 +269,14 @@ def diff_states(previous: dict[str, Any], latest: dict[str, Any]) -> dict[str, A
     latest_approvals = set(_state_list(latest_state, "what_needs_human_approval"))
     previous_action = str(previous_state.get("next_clean_action") or "")
     latest_action = str(latest_state.get("next_clean_action") or "")
+    disappeared = prev_unresolved - latest_unresolved
+    approved_resolutions = {
+        record["claim"] for record in latest_state.get("claim_resolutions", [])
+        if isinstance(record, dict) and record.get("kind") == "human_review"
+        and record.get("decision") == "approved" and record.get("reviewer")
+        and isinstance(record.get("claim"), str)
+    }
+    resolved = disappeared & (latest_true | approved_resolutions)
 
     return {
         "previous_state_hash": str(previous.get("state_hash") or previous.get("current_state_hash") or ""),
@@ -273,7 +285,8 @@ def diff_states(previous: dict[str, Any], latest: dict[str, Any]) -> dict[str, A
         "removed_truths": sorted(prev_true - latest_true),
         "still_unresolved": sorted(prev_unresolved & latest_unresolved),
         "new_unresolved_claims": sorted(latest_unresolved - prev_unresolved),
-        "resolved_claims": sorted(prev_unresolved - latest_unresolved),
+        "resolved_claims": sorted(resolved),
+        "removed_claims": sorted(disappeared - resolved),
         "new_contradictions": sorted(latest_contradictions - prev_contradictions),
         "cleared_contradictions": sorted(prev_contradictions - latest_contradictions),
         "new_approval_items": sorted(latest_approvals - prev_approvals),
@@ -371,13 +384,12 @@ def persist_lead_compile(
                 )
                 cur.execute(
                     """
-                    INSERT INTO yare_current_states (current_state_hash, run_id, state_json)
-                    VALUES (%s, %s, %s::jsonb)
+                    INSERT INTO yare_current_states (current_state_hash, run_id, state_json, packet_json)
+                    VALUES (%s, %s, %s::jsonb, %s::jsonb)
                     ON CONFLICT (current_state_hash) DO UPDATE SET
-                        run_id = excluded.run_id,
-                        state_json = excluded.state_json
+                        packet_json = COALESCE(yare_current_states.packet_json, excluded.packet_json)
                     """,
-                    (current_state_hash, run_id, _jsonb(packet.get("current_state") or {})),
+                    (current_state_hash, run_id, _jsonb(packet.get("current_state") or {}), _jsonb(packet)),
                 )
                 for artifact, artifact_row in zip(artifacts, artifact_rows):
                     cur.execute(
@@ -463,6 +475,10 @@ def search_memory(
 
     connector = connect_func or _connect
     query_vector = _vector_literal(embed_text(query))
+    terms = set(_tokens(query)) - SEARCH_STOP_WORDS
+    if not terms:
+        raise StorageError("memory_search_query_invalid: enter a meaningful query")
+    candidate_limit = min(max(limit * 10, 50), 500)
     try:
         with connector(url) as conn:
             with conn.cursor() as cur:
@@ -477,14 +493,36 @@ def search_memory(
                     ORDER BY embedding <=> %s::VECTOR
                     LIMIT %s
                     """,
-                    (query_vector, query_vector, limit),
+                    (query_vector, query_vector, candidate_limit),
                 )
                 rows = cur.fetchall()
+                matches = " OR ".join("LOWER(section_name || ' ' || source_text) LIKE %s" for _ in terms)
+                cur.execute(
+                    f"""SELECT section_name, embedding <=> %s::VECTOR AS distance,
+                               current_state_hash, source_text
+                        FROM yare_memory_vectors WHERE {matches}
+                        ORDER BY created_at DESC, current_state_hash DESC LIMIT %s""",
+                    (query_vector, *(f"%{term}%" for term in sorted(terms)), candidate_limit),
+                )
+                rows.extend(cur.fetchall())
     except StorageError:
         raise
     except Exception as e:
         raise StorageError(f"memory_search_failed: {e}") from e
 
+    def rank(row: Any) -> tuple[int, int, float, str]:
+        section_terms = set(_tokens(str(row[0]))) - SEARCH_STOP_WORDS
+        text_terms = set(_tokens(str(row[3]))) - SEARCH_STOP_WORDS
+        return (-len(terms & section_terms), -len(terms & text_terms), float(row[1]), str(row[2]))
+
+    unique = {}
+    for row in sorted(rows, key=rank):
+        section_overlap, text_overlap, _, _ = rank(row)
+        if section_overlap == 0 and text_overlap == 0:
+            continue
+        key = (str(row[0]), str(row[3]).strip().casefold())
+        unique.setdefault(key, row)
+    selected = list(unique.values())[:limit]
     return [
         {
             "section_name": str(row[0]),
@@ -492,7 +530,7 @@ def search_memory(
             "current_state_hash": str(row[2]),
             "source_text": str(row[3]),
         }
-        for row in rows
+        for row in selected
     ]
 
 
@@ -500,6 +538,7 @@ def memory_timeline(
     limit: int = 25,
     database_url: str | None = None,
     connect_func: Callable[[str], Any] | None = None,
+    task: str | None = None,
 ) -> list[dict[str, Any]]:
     url = _database_url(database_url)
     if not url:
@@ -516,7 +555,7 @@ def memory_timeline(
                     SELECT
                         cs.current_state_hash,
                         cs.created_at,
-                        COALESCE(r.task, ''),
+                        COALESCE(cs.packet_json->>'task', r.task, ''),
                         cs.run_id,
                         COALESCE((
                             SELECT yr.receipt_hash
@@ -528,10 +567,11 @@ def memory_timeline(
                         cs.state_json
                     FROM yare_current_states cs
                     LEFT JOIN yare_runs r ON r.run_id = cs.run_id
-                    ORDER BY cs.created_at ASC
+                    WHERE (%s::TEXT IS NULL OR COALESCE(cs.packet_json->>'task', r.task) = %s)
+                    ORDER BY cs.created_at DESC, cs.current_state_hash DESC
                     LIMIT %s
                     """,
-                    (limit,),
+                    (task, task, limit),
                 )
                 rows = cur.fetchall()
     except StorageError:
@@ -539,12 +579,13 @@ def memory_timeline(
     except Exception as e:
         raise StorageError(f"memory_timeline_failed: {e}") from e
 
-    return [timeline_entry(row) for row in rows]
+    return [timeline_entry(row) for row in reversed(rows)]
 
 
 def latest_memory_diff(
     database_url: str | None = None,
     connect_func: Callable[[str], Any] | None = None,
+    task: str | None = None,
 ) -> dict[str, Any]:
     url = _database_url(database_url)
     if not url:
@@ -559,7 +600,7 @@ def latest_memory_diff(
                     SELECT
                         cs.current_state_hash,
                         cs.created_at,
-                        COALESCE(r.task, ''),
+                        COALESCE(cs.packet_json->>'task', r.task, ''),
                         cs.run_id,
                         COALESCE((
                             SELECT yr.receipt_hash
@@ -571,9 +612,15 @@ def latest_memory_diff(
                         cs.state_json
                     FROM yare_current_states cs
                     LEFT JOIN yare_runs r ON r.run_id = cs.run_id
-                    ORDER BY cs.created_at DESC
+                    WHERE COALESCE(cs.packet_json->>'task', r.task) = COALESCE(%s::TEXT, (
+                        SELECT COALESCE(newest.packet_json->>'task', nr.task)
+                        FROM yare_current_states newest
+                        JOIN yare_runs nr ON nr.run_id = newest.run_id
+                        ORDER BY newest.created_at DESC, newest.current_state_hash DESC LIMIT 1
+                    ))
+                    ORDER BY cs.created_at DESC, cs.current_state_hash DESC
                     LIMIT 2
-                    """
+                    """, (task,)
                 )
                 rows = cur.fetchall()
     except StorageError:

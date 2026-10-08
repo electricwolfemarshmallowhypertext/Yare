@@ -4,7 +4,10 @@
     <loc>https://yare-vert.vercel.app/</loc>
   </url>
   <url>
-    <loc>https://yare-vert.vercel.app/use-cases.html</loc>
+    <loc>https://yare-vert.vercel.app/use-cases/</loc>
+  </url>
+  <url>
+    <loc>https://yare-vert.vercel.app/demo</loc>
   </url>
   <url>
     <loc>https://yare-vert.vercel.app/proof</loc>

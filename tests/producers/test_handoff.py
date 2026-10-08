@@ -5,6 +5,22 @@ from types import SimpleNamespace
 import pytest
 
 from producers import handoff
+from cli.storage import _hash_json
+
+
+def handoff_row():
+    source = "stored source"
+    artifact = {"run_id": "test-a", "evidence": {
+        "diff": "stored diff", "source_code": source,
+        "source_sha256": hashlib.sha256(source.encode()).hexdigest()}}
+    state = {"what_is_true": []}
+    packet = {"current_state": state, "artifacts": [artifact]}
+    state_hash = _hash_json(packet)
+    packet["deterministic_hash"] = state_hash
+    receipt = {"run_id": "test-a", "current_state_hash": state_hash}
+    receipt_hash = _hash_json(receipt)
+    receipt["receipt_hash"] = receipt_hash
+    return (state_hash, state, packet, receipt_hash, receipt)
 
 
 def test_artifact_separates_observed_tests_from_seeded_claim():
@@ -26,8 +42,7 @@ def test_handoff_reads_exact_run_from_database(monkeypatch):
 
     class Cursor:
         def __enter__(self):
-            self.rows = iter([("state-hash", {"task": "fix"}),
-                              ({"evidence": {"diff": "stored diff"}},), ("receipt-hash",)])
+            self.rows = iter([handoff_row()])
             return self
 
         def __exit__(self, *args):
@@ -52,9 +67,35 @@ def test_handoff_reads_exact_run_from_database(monkeypatch):
     monkeypatch.setattr(handoff.psycopg, "connect", lambda *args, **kwargs: Connection())
     stored = handoff.load_handoff("stub-url", "test-a")
     assert stored["artifact"]["evidence"]["diff"] == "stored diff"
-    assert stored["receipt_hash"] == "receipt-hash"
+    assert stored["receipt_hash"] == handoff_row()[3]
     assert all(params[0] == "test-a" for _, params in queries)
-    assert queries[-1][1] == ("test-a", "state-hash")
+    assert "cs.packet_json" in queries[0][0]
+    assert queries[-1][1] == ("test-a",)
+
+
+@pytest.mark.parametrize("corruption", ["state", "receipt", "source", "missing_packet"])
+def test_handoff_rejects_corrupted_snapshot_before_code_use(monkeypatch, corruption):
+    from unittest.mock import MagicMock
+    row = list(handoff_row())
+    if corruption == "state":
+        row[2]["artifacts"][0]["evidence"]["source_code"] = "other revision"
+    elif corruption == "receipt":
+        row[4]["run_id"] = "other-run"
+    elif corruption == "source":
+        row[2]["artifacts"][0]["evidence"]["source_sha256"] = "wrong"
+        material = {key: value for key, value in row[2].items() if key != "deterministic_hash"}
+        row[0] = _hash_json(material)
+        row[2]["deterministic_hash"] = row[0]
+        row[4]["current_state_hash"] = row[0]
+        row[3] = _hash_json({key: value for key, value in row[4].items() if key != "receipt_hash"})
+        row[4]["receipt_hash"] = row[3]
+    else:
+        row[2] = None
+    connection = MagicMock()
+    connection.__enter__.return_value.cursor.return_value.__enter__.return_value.fetchone.return_value = tuple(row)
+    monkeypatch.setattr(handoff.psycopg, "connect", lambda *args, **kwargs: connection)
+    with pytest.raises(ValueError, match="Stored handoff|Durable handoff"):
+        handoff.load_handoff("stub-url", "test-a")
 
 
 def test_original_source_access_requires_effective_policy_and_denial(tmp_path, monkeypatch):

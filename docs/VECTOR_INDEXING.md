@@ -61,7 +61,7 @@ python -m cli.yare lead compile --task "compile ai work lead state" --artifact e
 python -m cli.yare memory search --query "what still needs human review?" --limit 3
 ```
 
-The command embeds the query locally, searches CockroachDB with the vector index, and prints:
+The command embeds the query locally and collects vector-index candidates plus word matches from CockroachDB. It ranks matching sections and words before vector distance and removes repeated section/text results across snapshots. This combines word matching with the local hash vectors; it is not a learned language embedding model. It prints:
 
 - section name
 - distance

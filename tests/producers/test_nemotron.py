@@ -1,10 +1,44 @@
 import json
+import subprocess
+import sys
 
 import pytest
 
 from producers.nemotron import Budget, coding_loop, save_json
 
 MODEL = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+
+
+def test_stale_budget_objects_preserve_both_reservations_and_settlements(tmp_path):
+    path = tmp_path / "budget.json"
+    first, second = Budget(path), Budget(path)
+    one = first.reserve(MODEL, {"messages": [], "max_tokens": 1})
+    two = second.reserve(MODEL, {"messages": [], "max_tokens": 1})
+    first.settle(one, {"prompt_tokens": 10, "completion_tokens": 1})
+    second.settle(two, {"prompt_tokens": 11, "completion_tokens": 1})
+    calls = Budget(path).state["calls"]
+    assert len(calls) == 2
+    assert len({call["call_id"] for call in calls}) == 2
+    assert [call["usage"]["prompt_tokens"] for call in calls] == [10, 11]
+    with pytest.raises(ValueError, match="already settled"):
+        first.settle(one, {"prompt_tokens": 1, "completion_tokens": 1})
+
+
+def test_concurrent_processes_cannot_exceed_shared_call_limit(tmp_path):
+    path = tmp_path / "budget.json"
+    budget = Budget(path)
+    budget.state["max_calls"] = 3
+    save_json(path, budget.state)
+    code = ("from pathlib import Path; from producers.nemotron import Budget; "
+            f"Budget(Path({str(path)!r})).reserve({MODEL!r}, {{'messages': [], 'max_tokens': 1}})")
+    processes = [subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE,
+                                  stderr=subprocess.PIPE) for _ in range(8)]
+    for process in processes:
+        process.communicate(timeout=25)
+    calls = Budget(path).state["calls"]
+    assert sum(process.returncode == 0 for process in processes) == 3
+    assert len(calls) == 3
+    assert len({call["call_id"] for call in calls}) == 3
 
 
 def test_budget_survives_restart_and_stops_before_thirteenth_call(tmp_path):

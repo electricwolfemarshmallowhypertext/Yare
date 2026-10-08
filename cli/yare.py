@@ -1044,11 +1044,11 @@ def _lead_extract_files_touched(raw: dict[str, Any]) -> list[str]:
     return _lead_dedupe_sorted([_lead_norm_path(p) for p in files])
 
 
-def _lead_extract_claims(raw: dict[str, Any]) -> list[dict[str, str]]:
+def _lead_extract_claims(raw: dict[str, Any]) -> list[dict[str, Any]]:
     raw_claims = raw.get("claims")
     if raw_claims is None:
         raw_claims = raw.get("claims_made")
-    claims: list[dict[str, str]] = []
+    claims: list[dict[str, Any]] = []
     if isinstance(raw_claims, list):
         for item in raw_claims:
             if isinstance(item, str):
@@ -1059,14 +1059,36 @@ def _lead_extract_claims(raw: dict[str, Any]) -> list[dict[str, str]]:
                 text = str(item.get("claim") or item.get("text") or item.get("message") or "").strip()
                 if not text:
                     continue
-                claims.append(
-                    {
-                        "text": text,
-                        "verification_status": _lead_status(item.get("verification_status") or item.get("status")),
-                    }
-                )
+                claim = {
+                    "text": text,
+                    "verification_status": _lead_status(item.get("verification_status") or item.get("status")),
+                }
+                evidence = item.get("evidence")
+                if item.get("evidence_ref") and isinstance(raw.get("evidence"), dict):
+                    evidence = raw["evidence"].get(str(item["evidence_ref"]))
+                if isinstance(evidence, dict):
+                    claim["evidence"] = evidence
+                claims.append(claim)
     claims.sort(key=lambda x: (x["text"].lower(), x["verification_status"]))
     return claims
+
+
+def _lead_claim_supported(claim: dict[str, Any]) -> bool:
+    evidence = claim.get("evidence")
+    if not isinstance(evidence, dict) or evidence.get("claim") != claim.get("text"):
+        return False
+    if evidence.get("kind") == "test":
+        command = evidence.get("command")
+        return (isinstance(command, list) and bool(command) and
+                all(isinstance(part, str) and part for part in command) and
+                type(evidence.get("exit_code")) is int and
+                type(evidence.get("expected_exit_code")) is int and
+                evidence["exit_code"] == evidence["expected_exit_code"] and
+                any(isinstance(evidence.get(key), str) and evidence[key].strip()
+                    for key in ("stdout", "stderr")))
+    return (evidence.get("kind") == "human_review" and
+            evidence.get("decision") == "approved" and
+            isinstance(evidence.get("reviewer"), str) and bool(evidence["reviewer"].strip()))
 
 
 def _lead_extract_decisions(raw: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1274,9 +1296,9 @@ def _lead_compile_packet(root: Path, artifacts: list[dict[str, Any]], task_overr
             key = text.lower()
             claim_statuses.setdefault(key, set()).add(status)
             claim_original.setdefault(key, text)
-            if status == "verified":
+            if status == "verified" and _lead_claim_supported(claim):
                 true_claims.append(text)
-            elif status in {"unverified", "unknown"}:
+            elif status in {"verified", "unverified", "unknown"}:
                 unverified_claims.append(text)
             elif status == "contradicted":
                 contradictions.append(text)
@@ -1302,6 +1324,8 @@ def _lead_compile_packet(root: Path, artifacts: list[dict[str, Any]], task_overr
         needs_human_approval.extend(artifact.get("needs_human_approval", []))
     needs_human_approval = _lead_dedupe_sorted(needs_human_approval)
     contradictions = _lead_dedupe_sorted(contradictions)
+    disputed = {text.lower() for text in contradictions}
+    true_claims = [text for text in true_claims if text.lower() not in disputed]
     if contradictions:
         needs_human_approval.extend([f"Resolve contradiction: {c}" for c in contradictions])
         needs_human_approval = _lead_dedupe_sorted(needs_human_approval)
@@ -1357,6 +1381,12 @@ def _lead_compile_packet(root: Path, artifacts: list[dict[str, Any]], task_overr
             "what_needs_human_approval": needs_human_approval,
             "open_loops": open_loops,
             "next_clean_action": next_clean_action,
+            "claim_resolutions": [
+                record for artifact in artifacts_sorted
+                for record in (artifact.get("evidence") or {}).get("claim_resolutions", [])
+                if isinstance(record, dict) and record.get("kind") == "human_review"
+                and _lead_claim_supported({"text": record.get("claim"), "evidence": record})
+            ],
         },
         "proof": {
             "run_id": latest.get("run_id"),
@@ -1587,9 +1617,10 @@ def memory_search(
 @memory_app.command("timeline")
 def memory_timeline(
     limit: int = typer.Option(25, "--limit", min=1, help="Maximum timeline states to print"),
+    task: str | None = typer.Option(None, "--task", help="Show only this task's history"),
 ) -> None:
     try:
-        rows = storage_backend.memory_timeline(limit=limit)
+        rows = storage_backend.memory_timeline(limit=limit, **({"task": task} if task is not None else {}))
     except storage_backend.StorageError as e:
         typer.echo(str(e))
         raise typer.Exit(code=1)
@@ -1626,13 +1657,14 @@ def _echo_list(title: str, items: list[str]) -> None:
 @memory_app.command("diff")
 def memory_diff(
     latest: bool = typer.Option(False, "--latest", help="Compare latest current state to the previous one"),
+    task: str | None = typer.Option(None, "--task", help="Compare states belonging to this task"),
 ) -> None:
     if not latest:
         typer.echo("memory_diff_requires_latest: pass --latest")
         raise typer.Exit(code=1)
 
     try:
-        diff = storage_backend.latest_memory_diff()
+        diff = storage_backend.latest_memory_diff(**({"task": task} if task is not None else {}))
     except storage_backend.StorageError as e:
         typer.echo(str(e))
         raise typer.Exit(code=1)
@@ -1644,6 +1676,7 @@ def memory_diff(
     _echo_list("still_unresolved", diff["still_unresolved"])
     _echo_list("new_unresolved_claims", diff["new_unresolved_claims"])
     _echo_list("resolved_claims", diff["resolved_claims"])
+    _echo_list("removed_claims", diff.get("removed_claims", []))
     _echo_list("new_contradictions", diff["new_contradictions"])
     _echo_list("cleared_contradictions", diff["cleared_contradictions"])
     _echo_list("new_approval_items", diff["new_approval_items"])

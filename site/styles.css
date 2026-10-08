@@ -1064,14 +1064,19 @@ a:visited {
   }
 
   .use-case-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 22px;
   }
 
   .use-case-card {
+    min-width: 0;
     min-height: auto;
     padding: 82px 22px 24px;
     box-shadow: 8px 0 0 #000000;
+  }
+
+  .use-case-card h2 {
+    overflow-wrap: anywhere;
   }
 
   .use-case-actions {
