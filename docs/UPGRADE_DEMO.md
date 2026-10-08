@@ -1,8 +1,9 @@
 # Read-Only A/B Demo
 
-Status: the read-only upgrade preview was anonymously verified on October 8,
-2026 at https://yare-byridq0pg-saytionnes-projects.vercel.app/demo. The
-existing production site remains unchanged.
+Status: the read-only A/B demo was anonymously verified on the production site
+on October 8, 2026 at https://yare-vert.vercel.app/demo. The upgrade was
+promoted from its reviewed preview deployment; the Git `main` branch remains
+the legacy release.
 
 The existing `site/demo.html` layout now reads `/api/verified-handoff`. The
 endpoint selects only the two run, state-hash, and receipt-hash combinations
@@ -38,13 +39,16 @@ demo.
 
 ## Verification
 
-- An anonymous request to the preview `/demo` returned HTTP 200 with no
+- An anonymous request to the production `/demo` returned HTTP 200 with no
   Vercel login page. An anonymous request to `/api/verified-handoff` returned
   HTTP 200 with `nebius-boundary-20261007-a` and
   `nebius-boundary-20261007-b` and both receipt hashes. Clicking **Load
   verified handoff** in the public page rendered A's two remaining failures,
   B's six passing full-suite tests, and the sandbox-snapshot access result.
-- The production homepage still returned HTTP 200 with no login page.
+- The production homepage returned HTTP 200 with the updated upgrade copy and
+  no login page.
+- An anonymous POST to `/api/model-preview` returned HTTP 503 with public
+  model execution disabled. No paid model call was made.
 - A local live CockroachDB read returned both exact A/B state and receipt
   pairs; the browser rendered them after a button click.
 - `python -m pytest -q tests/yare/test_yare_cli.py tests/producers`: 86 passed.
@@ -54,6 +58,6 @@ demo.
   `git diff --check` passed.
 - The legacy compile demo completed. No Token Factory model call was made.
 
-The live production `/demo` remains the earlier approved-record viewer. The
-public upgrade preview is a separate deployment, not a production release.
-The paid model endpoint remains disabled.
+The paid model endpoint remains disabled. Production currently serves a
+promoted upgrade deployment; a future deployment from Git `main` could replace
+it because `main` remains the legacy branch.
