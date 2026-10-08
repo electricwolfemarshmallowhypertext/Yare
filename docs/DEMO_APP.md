@@ -2,7 +2,7 @@
 
 The Yare demo is a read-only live CockroachDB memory viewer.
 
-It lets a judge click one button and load the latest Yare handoff from the live database.
+It lets a judge click one button and load an explicitly published Yare handoff from the live database.
 
 ## Flow
 
@@ -20,7 +20,7 @@ browser
 GET /api/latest-handoff
 ```
 
-The endpoint reads `process.env.YARE_DATABASE_URL` on the server only. The database URL is never sent to the browser.
+The endpoint reads `process.env.YARE_DATABASE_URL` on the server only. The database URL is never sent to the browser. It selects only the run ID and current-state hash in `site/public-handoff.json`; compiling a newer private run does not publish it.
 
 It performs SELECT queries only. It does not write to CockroachDB, upload files, require auth, or expose a database UI.
 
@@ -56,7 +56,7 @@ https://yare-vert.vercel.app/demo
 Click:
 
 ```text
-Load latest live handoff
+Load public live handoff
 ```
 
 Expected status:
