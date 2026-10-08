@@ -1,7 +1,8 @@
 # Read-Only A/B Demo
 
-Status: locally verified on October 8, 2026. Not deployed or enabled for
-anonymous public access.
+Status: the read-only upgrade preview was anonymously verified on October 8,
+2026 at https://yare-byridq0pg-saytionnes-projects.vercel.app/demo. The
+existing production site remains unchanged.
 
 The existing `site/demo.html` layout now reads `/api/verified-handoff`. The
 endpoint selects only the two run, state-hash, and receipt-hash combinations
@@ -37,6 +38,13 @@ demo.
 
 ## Verification
 
+- An anonymous request to the preview `/demo` returned HTTP 200 with no
+  Vercel login page. An anonymous request to `/api/verified-handoff` returned
+  HTTP 200 with `nebius-boundary-20261007-a` and
+  `nebius-boundary-20261007-b` and both receipt hashes. Clicking **Load
+  verified handoff** in the public page rendered A's two remaining failures,
+  B's six passing full-suite tests, and the sandbox-snapshot access result.
+- The production homepage still returned HTTP 200 with no login page.
 - A local live CockroachDB read returned both exact A/B state and receipt
   pairs; the browser rendered them after a button click.
 - `python -m pytest -q tests/yare/test_yare_cli.py tests/producers`: 86 passed.
@@ -46,7 +54,6 @@ demo.
   `git diff --check` passed.
 - The legacy compile demo completed. No Token Factory model call was made.
 
-The live production `/demo` remains the earlier approved-record viewer until
-the upgraded page and its hosting are explicitly reviewed for release. A
-successful local read is not proof of anonymous access or availability through
-December 15.
+The live production `/demo` remains the earlier approved-record viewer. The
+public upgrade preview is a separate deployment, not a production release.
+The paid model endpoint remains disabled.
