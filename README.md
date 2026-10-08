@@ -115,10 +115,10 @@ Start with:
 
 - AI coding teams
 - engineering audit
-- compliance teams
-- vibe coders
-- content and research operators
-- devtool founders and AI agencies
+- contradiction and approval review
+- restart after a partial run
+- cross-tool memory read
+- state change review
 
 ## License
 
