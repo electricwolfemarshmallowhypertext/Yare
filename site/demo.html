@@ -3,223 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Yare Demo Viewer</title>
-  <meta name="description" content="A live read-only Yare demo that loads the latest handoff from CockroachDB memory.">
+  <title>Yare Verified Handoff</title>
+  <meta name="description" content="A read-only view of a verified coding handoff stored in CockroachDB.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Boogaloo&family=Inter:wght@300;400;600;700&family=Rubik+Mono+One&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css">
-  <style>
-    .demo-page {
-      position: relative;
-      z-index: 10;
-      padding: 86px 7% 96px;
-    }
-
-    .demo-hero {
-      max-width: 1180px;
-      margin-bottom: 34px;
-    }
-
-    .demo-hero span,
-    .meta-label {
-      display: block;
-      margin-bottom: 12px;
-      font-family: "Boogaloo", cursive;
-      font-size: clamp(12px, 1.4vw, 15px);
-      letter-spacing: 0.45em;
-      opacity: 0.68;
-    }
-
-    .demo-hero > span {
-      color: #ffffff;
-      opacity: 1;
-    }
-
-    .demo-hero h1 {
-      max-width: 1120px;
-      font-size: clamp(38px, 7vw, 94px);
-      font-weight: 400;
-      line-height: 0.98;
-      color: #000000;
-    }
-
-    .demo-hero p {
-      max-width: 760px;
-      margin-top: 18px;
-      color: #000000;
-    }
-
-    .demo-hero p svg {
-      width: 24px;
-      height: 24px;
-      vertical-align: -0.28em;
-    }
-
-    .demo-actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 14px;
-      margin: 28px 0 34px;
-    }
-
-    .demo-status {
-      display: inline-flex;
-      align-items: center;
-      min-height: 38px;
-      padding: 8px 12px;
-      background: var(--white);
-      border: 2px solid #000000;
-      font-family: "Inter", sans-serif;
-      font-size: 13px;
-      font-weight: 700;
-    }
-
-    .demo-layout {
-      display: grid;
-      grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
-      gap: 28px;
-      align-items: start;
-    }
-
-    .demo-panel,
-    .handoff-preview,
-    .meta-panel {
-      background: var(--white);
-      border: 3px solid #000000;
-      box-shadow: 10px 10px 0 #000000;
-      color: #000000;
-    }
-
-    .demo-panel,
-    .handoff-preview,
-    .meta-panel {
-      padding: 26px;
-    }
-
-    .handoff-preview {
-      position: sticky;
-      top: 86px;
-    }
-
-    .handoff-preview h2,
-    .demo-panel h2,
-    .meta-panel h2 {
-      font-size: clamp(22px, 3vw, 38px);
-      font-weight: 400;
-      line-height: 1;
-      margin-bottom: 14px;
-    }
-
-    .handoff-preview pre {
-      white-space: pre-wrap;
-      word-break: break-word;
-      font-family: "Inter", sans-serif;
-      font-size: 14px;
-      line-height: 1.45;
-    }
-
-    .demo-section {
-      padding: 20px 0;
-      border-top: 2px solid #000000;
-    }
-
-    .demo-section:first-child {
-      border-top: 0;
-      padding-top: 0;
-    }
-
-    .demo-section h3 {
-      margin-bottom: 10px;
-      font-size: clamp(20px, 2.8vw, 34px);
-      font-weight: 400;
-      line-height: 1;
-    }
-
-    .demo-section ul,
-    .meta-list {
-      display: grid;
-      gap: 8px;
-      padding-left: 20px;
-      font-family: "Inter", sans-serif;
-      font-size: clamp(14px, 1.4vw, 17px);
-      line-height: 1.45;
-    }
-
-    .demo-section li::marker,
-    .meta-list li::marker {
-      color: var(--pink);
-    }
-
-    .demo-empty {
-      font-family: "Inter", sans-serif;
-      font-size: 16px;
-      line-height: 1.5;
-    }
-
-    .meta-panel {
-      margin-bottom: 28px;
-    }
-
-    .meta-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
-      margin-top: 18px;
-      font-family: "Inter", sans-serif;
-    }
-
-    .meta-item {
-      border: 2px solid #000000;
-      padding: 12px;
-      min-width: 0;
-    }
-
-    .meta-item span {
-      display: block;
-      margin-bottom: 6px;
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-    }
-
-    .meta-item code {
-      display: block;
-      overflow-wrap: anywhere;
-      font-family: "Inter", sans-serif;
-      font-size: 13px;
-      line-height: 1.35;
-    }
-
-    @media (max-width: 860px) {
-      .demo-page {
-        padding: 48px 5% 70px;
-      }
-
-      .demo-layout,
-      .meta-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .handoff-preview {
-        position: static;
-      }
-    }
-
-    @media (max-width: 640px) {
-      .demo-actions {
-        flex-direction: column;
-        align-items: stretch;
-      }
-
-      .demo-panel,
-      .handoff-preview,
-      .meta-panel {
-        padding: 22px;
-        box-shadow: 7px 7px 0 #000000;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="demo.css">
 </head>
 <body id="top">
   <nav class="site-nav" aria-label="Primary navigation">
@@ -237,18 +27,18 @@
   <main class="demo-page">
     <header class="demo-hero">
       <span>LIVE DEMO</span>
-      <h1>Yare Demo Viewer</h1>
-      <p>Click <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mouse-pointer-click-icon lucide-mouse-pointer-click"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg> <strong>Load latest live handoff</strong> button to load the latest <strong>Yare</strong> handoff from live <strong><a href="https://github.com/cockroachdb/cockroach" target="_blank" rel="noopener">CockroachDB</a></strong> memory.</p>
+      <h1>Verified A/B handoff</h1>
+      <p>Click <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mouse-pointer-click-icon lucide-mouse-pointer-click"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg> <strong>Load verified handoff</strong> to read two exact Yare records from <strong><a href="https://github.com/cockroachdb/cockroach" target="_blank" rel="noopener">CockroachDB</a></strong>.</p>
       <p>View results below.</p>
       <p>This demo is read-only.</p>
-      <p>It does not write to the database, upload files, expose credentials, or require login.</p>
+      <p>It does not write to the database, upload files, expose credentials, or require login. The public summary is curated from the verified run; raw artifacts are not exposed.</p>
     </header>
 
     <div class="demo-actions" aria-label="Demo actions">
-      <button class="hero-button primary" type="button" id="loadHandoff">Load latest live handoff</button>
+      <button class="hero-button primary" type="button" id="loadHandoff">Load verified handoff</button>
       <button class="hero-button" type="button" id="copyHandoff" disabled>Copy handoff</button>
       <button class="hero-button" type="button" id="downloadJson" disabled>Download JSON</button>
-      <span class="demo-status" id="demoStatus">Waiting for live handoff</span>
+      <span class="demo-status" id="demoStatus">Waiting for verified handoff</span>
     </div>
 
     <section class="meta-panel" aria-label="Live handoff metadata">
@@ -256,27 +46,35 @@
       <h2 id="handoffTask">No handoff loaded.</h2>
       <div class="meta-grid">
         <div class="meta-item">
-          <span>run_id</span>
-          <code id="runId">none</code>
+          <span>A run_id</span>
+          <code id="aRunId">none</code>
         </div>
         <div class="meta-item">
-          <span>created_at</span>
-          <code id="createdAt">none</code>
+          <span>B run_id</span>
+          <code id="bRunId">none</code>
         </div>
         <div class="meta-item">
-          <span>current_state_hash</span>
-          <code id="currentStateHash">none</code>
+          <span>A state hash</span>
+          <code id="aStateHash">none</code>
         </div>
         <div class="meta-item">
-          <span>receipt_hash</span>
-          <code id="receiptHash">none</code>
+          <span>B state hash</span>
+          <code id="bStateHash">none</code>
+        </div>
+        <div class="meta-item">
+          <span>A receipt hash</span>
+          <code id="aReceiptHash">none</code>
+        </div>
+        <div class="meta-item">
+          <span>B receipt hash</span>
+          <code id="bReceiptHash">none</code>
         </div>
       </div>
     </section>
 
     <section class="demo-layout" aria-label="Live handoff viewer">
       <div class="demo-panel" id="handoffSections">
-        <p class="demo-empty">Load the latest handoff to see what changed, what is true, what is unresolved, contradictions, human approval items, open loops, and the next clean action.</p>
+        <p class="demo-empty">Load the verified A/B handoff to see A's partial test result, B's completion, the access decision, and both receipts.</p>
       </div>
 
       <aside class="handoff-preview">
@@ -296,166 +94,6 @@
     <div class="footer-logo">YARE</div>
   </footer>
 
-  <script>
-    const sectionMap = [
-      ["What changed", "what_changed"],
-      ["What is true", "what_is_true"],
-      ["What is unresolved", "what_is_unverified"],
-      ["Contradictions", "contradictions"],
-      ["Human approval items", "human_approval_items"],
-      ["Open loops", "open_loops"]
-    ];
-
-    const loadButton = document.getElementById("loadHandoff");
-    const copyButton = document.getElementById("copyHandoff");
-    const downloadButton = document.getElementById("downloadJson");
-    const statusEl = document.getElementById("demoStatus");
-    const sectionsEl = document.getElementById("handoffSections");
-    const handoffTextEl = document.getElementById("handoffText");
-    const handoffTaskEl = document.getElementById("handoffTask");
-    const runIdEl = document.getElementById("runId");
-    const createdAtEl = document.getElementById("createdAt");
-    const currentStateHashEl = document.getElementById("currentStateHash");
-    const receiptHashEl = document.getElementById("receiptHash");
-
-    let latestHandoff = null;
-
-    function asArray(value) {
-      return Array.isArray(value) ? value : [];
-    }
-
-    function listItem(value) {
-      if (typeof value === "string") return value;
-      if (value && typeof value === "object") {
-        const text = value.text || JSON.stringify(value);
-        return value.status ? `${text} (${value.status})` : text;
-      }
-      return String(value);
-    }
-
-    function setText(idEl, value) {
-      idEl.textContent = value || "none";
-    }
-
-    function renderSections(data) {
-      sectionsEl.innerHTML = sectionMap
-        .map(([title, key]) => {
-          const items = asArray(data[key]);
-          const list = items.length
-            ? items.map((item) => `<li>${listItem(item)}</li>`).join("")
-            : "<li>none</li>";
-          return `<section class="demo-section"><h3>${title}</h3><ul>${list}</ul></section>`;
-        })
-        .join("");
-
-      sectionsEl.insertAdjacentHTML(
-        "beforeend",
-        `<section class="demo-section"><h3>Next clean action</h3><ul><li>${data.next_clean_action || "none"}</li></ul></section>`
-      );
-    }
-
-    function buildHandoffText(data) {
-      const lines = [
-        "Yare live handoff",
-        "",
-        `Task: ${data.task || "none"}`,
-        `Run ID: ${data.run_id || "none"}`,
-        `Created: ${data.created_at || "none"}`,
-        `Current state hash: ${data.current_state_hash || "none"}`,
-        `Receipt hash: ${data.receipt_hash || "none"}`,
-        ""
-      ];
-
-      sectionMap.forEach(([title, key]) => {
-        const items = asArray(data[key]);
-        lines.push(`${title}:`);
-        if (items.length) {
-          lines.push(...items.map((item) => `- ${listItem(item)}`));
-        } else {
-          lines.push("- none");
-        }
-        lines.push("");
-      });
-
-      lines.push("Next clean action:");
-      lines.push(`- ${data.next_clean_action || "none"}`);
-      return lines.join("\n");
-    }
-
-    function copyText(text) {
-      if (navigator.clipboard && window.isSecureContext) {
-        return navigator.clipboard.writeText(text);
-      }
-
-      const area = document.createElement("textarea");
-      area.value = text;
-      area.setAttribute("readonly", "");
-      area.style.position = "fixed";
-      area.style.left = "-9999px";
-      document.body.appendChild(area);
-      area.select();
-      document.execCommand("copy");
-      area.remove();
-      return Promise.resolve();
-    }
-
-    function downloadJson(payload, filename) {
-      const blob = new Blob([JSON.stringify(payload, null, 2)], {
-        type: "application/json"
-      });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-    }
-
-    async function loadLatestHandoff() {
-      statusEl.textContent = "Loading live CockroachDB memory...";
-      loadButton.disabled = true;
-
-      try {
-        const response = await fetch("/api/latest-handoff");
-        if (!response.ok) {
-          const message = await response.text();
-          throw new Error(message || `Request failed with ${response.status}`);
-        }
-
-        latestHandoff = await response.json();
-        setText(handoffTaskEl, latestHandoff.task);
-        setText(runIdEl, latestHandoff.run_id);
-        setText(createdAtEl, latestHandoff.created_at);
-        setText(currentStateHashEl, latestHandoff.current_state_hash);
-        setText(receiptHashEl, latestHandoff.receipt_hash);
-        renderSections(latestHandoff);
-        handoffTextEl.textContent = buildHandoffText(latestHandoff);
-        copyButton.disabled = false;
-        downloadButton.disabled = false;
-        statusEl.textContent = "Loaded from live CockroachDB memory";
-      } catch (error) {
-        statusEl.textContent = `Live handoff failed: ${error.message}`;
-        handoffTextEl.textContent = error.message;
-      } finally {
-        loadButton.disabled = false;
-      }
-    }
-
-    loadButton.addEventListener("click", loadLatestHandoff);
-
-    copyButton.addEventListener("click", () => {
-      copyText(handoffTextEl.textContent).then(() => {
-        statusEl.textContent = "Handoff copied";
-      });
-    });
-
-    downloadButton.addEventListener("click", () => {
-      if (!latestHandoff) return;
-      downloadJson(latestHandoff, "latest-yare-handoff.json");
-      statusEl.textContent = "JSON downloaded";
-    });
-  </script>
+  <script src="demo.js"></script>
 </body>
 </html>
