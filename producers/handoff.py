@@ -87,12 +87,16 @@ def load_handoff(database_url, run_id):
             "artifact": artifact, "receipt_hash": receipt_hash}
 
 
-def make_artifact(run_id, phase, result, source, full_test, policy_hash):
+def make_artifact(run_id, phase, result, source, full_test, policy_hash, parent_handoff=None):
     evidence = {"partial_test": result["final_test"], "full_test": full_test,
                 "diff": result["diff"], "source_code": source,
                 "source_sha256": hashlib.sha256(source.encode()).hexdigest(),
                 "policy_sha256": policy_hash,
                 "handoff_assessment": result.get("handoff_assessment")}
+    if parent_handoff is not None:
+        evidence["parent_handoff"] = {
+            key: parent_handoff[key] for key in ("run_id", "current_state_hash", "receipt_hash")
+        }
     claim = (f"Agent {phase} observed test command {json.dumps(result['final_test']['command'])} "
              "passed with exit code 0")
     evidence["test_claim"] = {**result["final_test"], "kind": "test", "claim": claim,
@@ -168,7 +172,7 @@ def main():
     policy_name = f"agent-{args.phase}-boundary.yaml" if args.boundary_original else f"agent-{args.phase}{policy_suffix}.yaml"
     policy = root / "examples/nemotron-handoff" / policy_name
     artifact = make_artifact(args.run_id + "-" + args.phase, phase, result, source, full_test,
-                             hashlib.sha256(policy.read_bytes()).hexdigest())
+                             hashlib.sha256(policy.read_bytes()).hexdigest(), parent_handoff=loaded)
     artifact["evidence"]["inference_transport"] = "OpenShell endpoint-bound provider" if args.routed else "host controller"
     if access is not None:
         artifact["evidence"]["original_source_access"] = access

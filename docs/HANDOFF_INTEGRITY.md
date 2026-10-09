@@ -10,6 +10,8 @@ Local producer ledger updates are locked across processes. Each update reloads t
 
 Each new current-state row stores its complete compiled packet, including its source artifacts. B reads that snapshot with the matching receipt and recalculates the state, receipt, and source-code hashes before using the code. Historical records can use the run's stored packet only when it matches the selected state hash. An unavailable or mismatched packet stops the handoff.
 
+New B artifacts also record `evidence.parent_handoff` with the exact run ID, state hash, and receipt hash returned by the loader. This binds future artifacts to the consumed handoff instead of relying on a later recompile's IDs. It does not add that provenance retroactively to historical records. This addition is fixture-tested; no new paid run was performed for it.
+
 Run `python -m cli.yare storage init` to add the optional `packet_json` column to an existing database. Existing records and receipt hashes are preserved.
 
 ## Supported Claims

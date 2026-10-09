@@ -73,6 +73,28 @@ def test_handoff_reads_exact_run_from_database(monkeypatch):
     assert queries[-1][1] == ("test-a",)
 
 
+def test_b_artifact_binds_consumed_handoff_without_private_metadata():
+    from cli import yare
+    parent = {"run_id": "a-original", "current_state_hash": "consumed-state",
+              "receipt_hash": "consumed-receipt", "private_metadata": "must not copy"}
+    test = {"command": ["python", "-m", "unittest"], "exit_code": 0, "stdout": "6 passed", "stderr": ""}
+    result = {"final_test": test, "diff": "B patch"}
+    artifact = handoff.make_artifact("test-b", "B", result, "source", test, "policy", parent_handoff=parent)
+    expected = {key: parent[key] for key in ("run_id", "current_state_hash", "receipt_hash")}
+    assert artifact["evidence"]["parent_handoff"] == expected
+    normalized = yare._lead_normalize_artifact(artifact, "artifact:b", 1)
+    assert normalized["evidence"]["parent_handoff"] == expected
+    parent["current_state_hash"] = "later-recompile"
+    assert artifact["evidence"]["parent_handoff"]["current_state_hash"] == "consumed-state"
+
+
+def test_a_artifact_does_not_invent_parent_provenance():
+    test = {"command": ["python"], "exit_code": 0, "stdout": "passed"}
+    artifact = handoff.make_artifact("test-a", "A", {"final_test": test, "diff": "patch"},
+                                     "source", test, "policy")
+    assert "parent_handoff" not in artifact["evidence"]
+
+
 @pytest.mark.parametrize("corruption", ["state", "receipt", "source", "missing_packet"])
 def test_handoff_rejects_corrupted_snapshot_before_code_use(monkeypatch, corruption):
     from unittest.mock import MagicMock
