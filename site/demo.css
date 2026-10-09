@@ -129,6 +129,8 @@
     .demo-section ul,
     .meta-list {
       display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      overflow-wrap: anywhere;
       gap: 8px;
       padding-left: 20px;
       font-family: "Inter", sans-serif;
