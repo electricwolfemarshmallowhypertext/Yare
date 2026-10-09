@@ -24,6 +24,20 @@ function addSection(title, lines) {
   }
   section.append(heading, list);
   sectionsEl.appendChild(section);
+  return section;
+}
+
+function addEvidence(title, value) {
+  const section = addSection(title, []);
+  const output = document.createElement("pre");
+  output.className = "evidence-output";
+  output.textContent = value || "No output recorded.";
+  section.appendChild(output);
+}
+
+function testText(test) {
+  return [`$ ${test.command.join(" ")}`, `Exit code: ${test.exit_code}`,
+    test.stdout, test.stderr].filter(Boolean).join("\n");
 }
 
 function render(data) {
@@ -34,15 +48,32 @@ function render(data) {
     setText(`${phase}ReceiptHash`, data[phase].receipt_hash);
   }
   sectionsEl.replaceChildren();
-  addSection("A: partial handoff", [data.a.result, `Next action: ${data.a.next_action}`]);
-  addSection("B: completion", [data.b.result, `Next action: ${data.b.next_action}`]);
-  addSection("Access and scope", [data.source_access, data.scope]);
+  addEvidence("A: saved partial patch", data.a.patch);
+  addEvidence("A: targeted tests", testText(data.a.targeted_test));
+  addEvidence("A: full-suite failures", testText(data.a.full_test));
+  addEvidence("Stored Yare handoff from A", JSON.stringify(data.a.handoff, null, 2));
+  if (data.b.assessment) {
+    addEvidence("B: recorded handoff assessment (agent statement)", JSON.stringify(data.b.assessment, null, 2));
+  }
+  addEvidence("B: saved completion patch", data.b.patch);
+  addEvidence("B: full-suite test output", testText(data.b.full_test));
+  addEvidence("Stored Yare handoff from B", JSON.stringify(data.b.handoff, null, 2));
+  addSection("Recorded access decisions", [
+    `A: policy allows read = ${data.a.access.policy_allows_read}; command exit = ${data.a.access.exit_code}`,
+    `B: policy allows read = ${data.b.access.policy_allows_read}; command exit = ${data.b.access.exit_code}`,
+    data.b.access.stderr,
+    `Task snapshot hash: ${data.a.access.source_sha256}`, data.scope
+  ]);
   handoffTextEl.textContent = [
-    "Yare verified A/B handoff", "", `Task: ${data.task}`, "",
-    `A: ${data.a.result}`, `A state: ${data.a.current_state_hash}`,
-    `A receipt: ${data.a.receipt_hash}`, "",
-    `B: ${data.b.result}`, `B state: ${data.b.current_state_hash}`,
-    `B receipt: ${data.b.receipt_hash}`, "", data.source_access,
+    "Yare recorded A/B evidence", "", `Task: ${data.task}`, "",
+    "A patch", data.a.patch, "A targeted tests", testText(data.a.targeted_test),
+    "A full suite", testText(data.a.full_test), "A stored handoff", JSON.stringify(data.a.handoff, null, 2),
+    `A state: ${data.a.current_state_hash}`, `A receipt: ${data.a.receipt_hash}`, "",
+    "B patch", data.b.patch, "B full suite", testText(data.b.full_test),
+    "B recorded assessment (agent statement)", JSON.stringify(data.b.assessment, null, 2),
+    "B stored handoff", JSON.stringify(data.b.handoff, null, 2),
+    `B state: ${data.b.current_state_hash}`, `B receipt: ${data.b.receipt_hash}`, "",
+    "Access decisions", JSON.stringify({ a: data.a.access, b: data.b.access }, null, 2),
     data.scope, "", data.summary_source
   ].join("\n");
 }
@@ -77,6 +108,9 @@ function downloadJson(payload) {
 loadButton.addEventListener("click", async () => {
   statusEl.textContent = "Loading verified CockroachDB records...";
   loadButton.disabled = true;
+  verifiedHandoff = null;
+  copyButton.disabled = true;
+  downloadButton.disabled = true;
   try {
     const response = await fetch("/api/verified-handoff");
     if (!response.ok) throw new Error("Verified handoff is not available");
@@ -84,9 +118,10 @@ loadButton.addEventListener("click", async () => {
     render(verifiedHandoff);
     copyButton.disabled = false;
     downloadButton.disabled = false;
-    statusEl.textContent = "Loaded two verified CockroachDB records";
+    statusEl.textContent = "Loaded saved patches, tests and handoffs from CockroachDB";
   } catch (error) {
     statusEl.textContent = error.message;
+    sectionsEl.replaceChildren();
     handoffTextEl.textContent = error.message;
   } finally {
     loadButton.disabled = false;
