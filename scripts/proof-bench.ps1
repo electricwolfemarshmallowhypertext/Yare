@@ -109,7 +109,7 @@ if ($hasS3) {
 
 Write-Output ""
 Write-Output "compile:"
-$compileOutput = Invoke-Yare -Arguments @(
+$compileArguments = @(
     "lead",
     "compile",
     "--task",
@@ -121,6 +121,7 @@ $compileOutput = Invoke-Yare -Arguments @(
     "--artifact",
     "examples/lead-artifacts/run-gemini.jsonl"
 )
+$compileOutput = Invoke-Yare -Arguments $compileArguments
 $compileOutput | ForEach-Object { Write-Output $_ }
 
 $deterministicHash = Find-OutputValue -Output $compileOutput -Name "deterministic_hash"
@@ -128,8 +129,31 @@ $receipt = Find-OutputValue -Output $compileOutput -Name "receipt"
 $receiptHash = Find-OutputValue -Output $compileOutput -Name "receipt_hash"
 $s3Uris = @($compileOutput | ForEach-Object { [string]$_ } | Where-Object { $_ -match "^s3_uri:\s*" })
 
+function Assert-BenchOutput {
+    param([object[]]$Output, [string]$PreviousState, [string]$PreviousReceipt)
+    $packetPath = Find-OutputValue -Output $Output -Name "current_state_json"
+    $markdownPath = Find-OutputValue -Output $Output -Name "current_state_md"
+    $receiptPath = Find-OutputValue -Output $Output -Name "receipt"
+    if (-not $packetPath -or -not $markdownPath -or -not $receiptPath) {
+        throw "compile did not report all proof files"
+    }
+    $arguments = @("--packet", $packetPath, "--markdown", $markdownPath, "--receipt", $receiptPath)
+    if ($PreviousState) {
+        $arguments += @("--previous-state", $PreviousState, "--previous-receipt", $PreviousReceipt)
+    }
+    & python -m scripts.proof_bench @arguments
+    if ($LASTEXITCODE -ne 0) { throw "handoff integrity assertions failed" }
+}
+
+Assert-BenchOutput -Output $compileOutput
+Write-Output "repeat compile:"
+$repeatOutput = Invoke-Yare -Arguments $compileArguments
+$repeatOutput | ForEach-Object { Write-Output $_ }
+Assert-BenchOutput -Output $repeatOutput -PreviousState $deterministicHash -PreviousReceipt $receiptHash
+
 Write-Output ""
 Write-Output "bench summary:"
+Write-Output "summary_scope: first compile; repeat compile IDs printed above"
 Write-Output "current_state_hash: $(if ($deterministicHash) { $deterministicHash } else { '<not found>' })"
 Write-Output "receipt: $(if ($receipt) { $receipt } else { '<not found>' })"
 Write-Output "receipt_hash: $(if ($receiptHash) { $receiptHash } else { '<not found>' })"
@@ -155,12 +179,12 @@ if ($hasDatabase) {
 
     Write-Output ""
     Write-Output "memory timeline:"
-    $timelineOutput = Invoke-Yare -Arguments @("memory", "timeline")
+    $timelineOutput = Invoke-Yare -Arguments @("memory", "timeline", "--task", "compile ai work lead state")
     $timelineOutput | ForEach-Object { Write-Output $_ }
 
     Write-Output ""
     Write-Output "memory diff:"
-    $diffOutput = Invoke-Yare -Arguments @("memory", "diff", "--latest")
+    $diffOutput = Invoke-Yare -Arguments @("memory", "diff", "--latest", "--task", "compile ai work lead state")
     $diffOutput | ForEach-Object { Write-Output $_ }
 } else {
     Write-Output ""
@@ -170,4 +194,4 @@ if ($hasDatabase) {
 }
 
 Write-Output ""
-Write-Output "bench: complete"
+Write-Output "bench: configured assertions passed; missing services skipped; MCP sessions not run"

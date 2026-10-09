@@ -31,7 +31,7 @@
     </header>
 
     <section class="proof-intro" aria-label="What the bench verifies">
-      <h2>The bench verifies that Yare can:</h2>
+      <h2>Recorded checks cover:</h2>
       <ul>
         <li>compile scattered agent output into one current-state handoff</li>
         <li>detect contradictions</li>
@@ -41,6 +41,7 @@
         <li>expose the same handoff through MCP</li>
         <li>show how work-state changed over time</li>
       </ul>
+      <p>The results below are separate recorded integration checks, not one combined run. The local bench checks expected handoff content, repeatable state hashes, receipt integrity, and configured storage read-back. MCP client sessions are separate.</p>
     </section>
 
     <section class="proof-table-wrap" aria-label="Proof matrix">
@@ -91,7 +92,7 @@
           <tr>
             <td>Deterministic state hash and receipt integrity</td>
             <td><span class="pass-pill">PASS</span></td>
-            <td><a href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/REAL_USE_CASE_RESULT.md" target="_blank" rel="noopener">Handoff result</a></td>
+            <td><a href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/nebius-upgrade/docs/HANDOFF_ASSERTIONS_RESULT.md" target="_blank" rel="noopener">Assertion result</a></td>
           </tr>
         </tbody>
       </table>
@@ -100,11 +101,11 @@
     <section class="proof-reproduce" aria-label="Reproduce the bench">
       <span>REPRODUCE</span>
       <h2>Run the bench locally.</h2>
-      <p>Run the sample handoff compile. Add live env vars when you want CockroachDB memory and S3 archive checks included.</p>
+      <p>Compile the samples twice and check the expected handoff, stable state hash, and receipt integrity. Configured CockroachDB records and S3 object bodies must match the compiled output.</p>
       <pre><code>.\scripts\proof-bench.ps1</code></pre>
       <p>Set <code>YARE_DATABASE_URL</code> or pass <code>-DatabaseUrl</code> for CockroachDB checks. Set <code>YARE_S3_BUCKET</code> or pass <code>-S3Bucket</code> plus AWS credentials for S3 archive checks. Missing live config is reported as skipped, not failed.</p>
-      <a class="hero-button primary" href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/HANDOFF_INTEGRITY_BENCH.md" target="_blank" rel="noopener">Read bench doc</a>
-      <a class="hero-button pink" href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/docs/HANDOFF_INTEGRITY_BENCH_RESULT.md" target="_blank" rel="noopener">Latest bench result</a>
+      <a class="hero-button primary" href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/nebius-upgrade/docs/HANDOFF_INTEGRITY_BENCH.md" target="_blank" rel="noopener">Read bench doc</a>
+      <a class="hero-button pink" href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/nebius-upgrade/docs/HANDOFF_ASSERTIONS_RESULT.md" target="_blank" rel="noopener">Latest bench result</a>
     </section>
   </main>
 

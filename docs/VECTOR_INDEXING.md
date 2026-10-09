@@ -14,7 +14,7 @@ After `yare lead compile` succeeds and `YARE_DATABASE_URL` is set, Yare persists
 - open loops
 - next clean action
 
-Yare uses a deterministic local text-to-vector hashing function. It does not call OpenAI, Bedrock, or any external embedding service.
+Yare uses 32-dimensional deterministic token hashing. Search combines vector distance with word overlap, a small synonym map, and section ranking. This is word-assisted vector search, not a learned semantic embedding model or a measured general-language retrieval score. It does not call OpenAI, Bedrock, or any external embedding service.
 
 ## CockroachDB Schema
 
