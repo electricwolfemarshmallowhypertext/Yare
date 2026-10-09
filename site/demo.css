@@ -82,6 +82,7 @@
     .demo-panel,
     .handoff-preview,
     .meta-panel {
+      min-width: 0;
       padding: 26px;
     }
 
@@ -118,6 +119,7 @@
     }
 
     .demo-section h3 {
+      overflow-wrap: anywhere;
       margin-bottom: 10px;
       font-size: clamp(20px, 2.8vw, 34px);
       font-weight: 400;
@@ -196,7 +198,7 @@
 
       .demo-layout,
       .meta-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
       }
 
       .handoff-preview {
