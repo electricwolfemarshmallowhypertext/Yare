@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Yare Verified Handoff</title>
+  <title>Yare | A Coding Handoff</title>
   <meta name="description" content="A read-only view of a verified coding handoff stored in CockroachDB.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,12 +27,10 @@
   <main class="demo-page">
     <header class="demo-hero">
       <span>RECORDED RUN · LIVE DATABASE</span>
-      <h1>Verified A/B handoff</h1>
+      <h1>One agent stopped. The next finished.</h1>
       <p>Click <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mouse-pointer-click-icon lucide-mouse-pointer-click"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg> <strong>Load verified handoff</strong> to read two exact Yare records from <strong><a href="https://github.com/cockroachdb/cockroach" target="_blank" rel="noopener">CockroachDB</a></strong>.</p>
-      <p>View results below.</p>
-      <p>This demo is read-only.</p>
-      <p>It loads saved patches, test output and handoffs from one completed A/B run. It does not start agents, write to the database, upload files, expose credentials, or require login. Only approved task evidence is shown; private metadata is excluded.</p>
-      <p>The saved artifacts were recompiled after the coding run to bind recorded access decisions into receipts. No new coding or permission test runs when you click.</p>
+      <p>Yare saved the first agent's code, failing tests and unfinished work. A fresh agent loaded that handoff from CockroachDB and completed the fix.</p>
+      <p>This is a recorded coding run. Loading it reads saved evidence; it does not start agents or make new model calls.</p>
     </header>
 
     <div class="demo-actions" aria-label="Demo actions">
@@ -44,7 +42,10 @@
 
     <section class="meta-panel" aria-label="Live handoff metadata">
       <span class="meta-label">LIVE COCKROACHDB MEMORY</span>
-      <h2 id="handoffTask">No handoff loaded.</h2>
+      <h2 id="handoffTask">Load the handoff to see what happened.</h2>
+      <details class="evidence-details">
+        <summary>Inspect saved record IDs and receipts</summary>
+        <p>The artifacts were recompiled after the coding run to include recorded access decisions. These are saved records, not a new execution.</p>
       <div class="meta-grid">
         <div class="meta-item">
           <span>A run_id</span>
@@ -71,17 +72,15 @@
           <code id="bReceiptHash">none</code>
         </div>
       </div>
+      </details>
     </section>
 
     <section class="demo-layout" aria-label="Live handoff viewer">
       <div class="demo-panel" id="handoffSections">
-        <p class="demo-empty">Load the verified A/B handoff to see A's partial test result, B's completion, the access decision, and both receipts.</p>
+        <p class="demo-empty">Load the handoff to see what the first agent left unfinished and how the next agent completed it.</p>
       </div>
 
-      <aside class="handoff-preview">
-        <h2>Plain handoff</h2>
-        <pre id="handoffText">No handoff loaded.</pre>
-      </aside>
+      <pre id="handoffText" hidden>No handoff loaded.</pre>
     </section>
   </main>
 

@@ -65,7 +65,7 @@
 
     .demo-layout {
       display: grid;
-      grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+      grid-template-columns: minmax(0, 1fr);
       gap: 28px;
       align-items: start;
     }
@@ -150,6 +150,27 @@
       overflow-wrap: anywhere;
       font-family: monospace;
       font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .evidence-details {
+      min-width: 0;
+      padding: 16px 0;
+      border-top: 2px solid #000000;
+      font-family: "Inter", sans-serif;
+      overflow-wrap: anywhere;
+    }
+
+    .evidence-details summary {
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    .evidence-details p {
+      margin-top: 12px;
+      font-size: 14px;
       line-height: 1.5;
     }
 

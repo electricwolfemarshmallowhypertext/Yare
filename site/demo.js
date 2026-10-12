@@ -28,11 +28,23 @@ function addSection(title, lines) {
 }
 
 function addEvidence(title, value) {
-  const section = addSection(title, []);
+  const section = document.createElement("details");
+  section.className = "evidence-details";
+  const heading = document.createElement("summary");
+  heading.textContent = title;
   const output = document.createElement("pre");
   output.className = "evidence-output";
   output.textContent = value || "No output recorded.";
-  section.appendChild(output);
+  section.append(heading, output);
+  sectionsEl.appendChild(section);
+}
+
+function testResult(test) {
+  const output = [test.stdout, test.stderr].filter(Boolean).join("\n");
+  const count = output.match(/Ran (\d+) tests?\b/);
+  const failures = output.match(/failures=(\d+)/);
+  if (test.exit_code === 0) return count ? `All ${count[1]} tests passed.` : "The recorded test command passed.";
+  return failures ? `${failures[1]} test failures remained in the full suite.` : `The recorded test command failed (exit ${test.exit_code}).`;
 }
 
 function testText(test) {
@@ -41,13 +53,39 @@ function testText(test) {
 }
 
 function render(data) {
-  setText("handoffTask", data.task);
+  setText("handoffTask", data.task === "Evidence-based claim classification with case and whitespace normalization"
+    ? "From unfinished code to passing tests" : data.task);
   for (const phase of ["a", "b"]) {
     setText(`${phase}RunId`, data[phase].run_id);
     setText(`${phase}StateHash`, data[phase].current_state_hash);
     setText(`${phase}ReceiptHash`, data[phase].receipt_hash);
   }
   sectionsEl.replaceChildren();
+  addSection("The first agent", [
+    "Changed workstate.py so a claim needs supporting evidence before it is marked verified.",
+    `Focused checks: ${testResult(data.a.targeted_test)}`,
+    `Full checks: ${testResult(data.a.full_test)}`
+  ]);
+  addSection("What Yare saved", [
+    "The code change, actual test output and remaining work were stored in CockroachDB.",
+    ...data.a.handoff.what_is_unverified.map(claim => `Not confirmed: ${claim}.`),
+    ...data.a.handoff.open_loops.map(loop => `Still to do: ${typeof loop === "string" ? loop : loop.text}.`)
+  ]);
+  addSection("The next agent", [
+    "Loaded the saved handoff instead of relying on the previous agent's running process.",
+    ...(data.b.patch.includes(".strip().lower()") ? ["Fixed handling of capital letters and extra spaces."] : ["Made the completion patch shown in the evidence below."]),
+    testResult(data.b.full_test)
+  ]);
+  addSection("What happens next", [
+    data.b.handoff.next_clean_action,
+    data.b.handoff.open_loops.length === 0 ? "No open work is listed in the final handoff." : `${data.b.handoff.open_loops.length} open items remain.`,
+    data.b.handoff.what_is_unverified.length === 0 ? "No unverified claims remain in the final handoff." : `${data.b.handoff.what_is_unverified.length} claims still need verification.`,
+    data.b.handoff.what_needs_human_approval.length === 0 ? "No human approval items are recorded." : `${data.b.handoff.what_needs_human_approval.length} items need human review.`,
+    "This demonstrates one recorded task, not a broad benchmark score."
+  ]);
+  const evidenceHeading = document.createElement("h2");
+  evidenceHeading.textContent = "Inspect evidence";
+  sectionsEl.appendChild(evidenceHeading);
   addEvidence("A: saved partial patch", data.a.patch);
   addEvidence("A: targeted tests", testText(data.a.targeted_test));
   addEvidence("A: full-suite failures", testText(data.a.full_test));
@@ -58,23 +96,32 @@ function render(data) {
   addEvidence("B: saved completion patch", data.b.patch);
   addEvidence("B: full-suite test output", testText(data.b.full_test));
   addEvidence("Stored Yare handoff from B", JSON.stringify(data.b.handoff, null, 2));
-  addSection("Recorded access decisions", [
+  addEvidence("Recorded access decisions", [
     `A: policy allows read = ${data.a.access.policy_allows_read}; command exit = ${data.a.access.exit_code}`,
     `B: policy allows read = ${data.b.access.policy_allows_read}; command exit = ${data.b.access.exit_code}`,
     data.b.access.stderr,
     `Task snapshot hash: ${data.a.access.source_sha256}`, data.scope
-  ]);
+  ].filter(Boolean).join("\n"));
+  const finalState = data.b.handoff;
+  const lines = values => values.length
+    ? values.map(value => `- ${typeof value === "string" ? value : value.text}`).join("\n")
+    : "None recorded.";
   handoffTextEl.textContent = [
-    "Yare recorded A/B evidence", "", `Task: ${data.task}`, "",
-    "A patch", data.a.patch, "A targeted tests", testText(data.a.targeted_test),
-    "A full suite", testText(data.a.full_test), "A stored handoff", JSON.stringify(data.a.handoff, null, 2),
-    `A state: ${data.a.current_state_hash}`, `A receipt: ${data.a.receipt_hash}`, "",
-    "B patch", data.b.patch, "B full suite", testText(data.b.full_test),
-    "B recorded assessment (agent statement)", JSON.stringify(data.b.assessment, null, 2),
-    "B stored handoff", JSON.stringify(data.b.handoff, null, 2),
-    `B state: ${data.b.current_state_hash}`, `B receipt: ${data.b.receipt_hash}`, "",
-    "Access decisions", JSON.stringify({ a: data.a.access, b: data.b.access }, null, 2),
-    data.scope, "", data.summary_source
+    "Yare coding handoff", "",
+    "The first agent left a partial fix. Yare saved its code, test results and unfinished work in CockroachDB. A fresh agent loaded that handoff and completed the fix.", "",
+    "What changed", lines(finalState.what_changed),
+    ...(data.b.patch.includes(".strip().lower()") ? ["The fix now handles capital letters and extra spaces."] : []), "",
+    "What the tests show", `First agent, focused checks: ${testResult(data.a.targeted_test)}`,
+    `First agent, full checks: ${testResult(data.a.full_test)}`,
+    `Next agent, full checks: ${testResult(data.b.full_test)}`, "",
+    "What was not confirmed in the first handoff", lines(data.a.handoff.what_is_unverified), "",
+    "What is still unverified", lines(finalState.what_is_unverified), "",
+    "Contradictions", lines(finalState.what_contradicts_prior_state), "",
+    "Needs human review", lines(finalState.what_needs_human_approval), "",
+    "Unfinished work", lines(finalState.open_loops), "",
+    "Next action", finalState.next_clean_action, "",
+    "This is one recorded coding task. Reading it does not start a new agent run.",
+    "Technical patches, logs and record identifiers are available in the demo's evidence sections and JSON download."
   ].join("\n");
 }
 
@@ -118,7 +165,7 @@ loadButton.addEventListener("click", async () => {
     render(verifiedHandoff);
     copyButton.disabled = false;
     downloadButton.disabled = false;
-    statusEl.textContent = "Loaded saved patches, tests and handoffs from CockroachDB";
+    statusEl.textContent = "Recorded handoff loaded from CockroachDB";
   } catch (error) {
     statusEl.textContent = error.message;
     sectionsEl.replaceChildren();
