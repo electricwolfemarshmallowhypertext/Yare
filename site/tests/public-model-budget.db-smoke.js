@@ -3,8 +3,8 @@ const { randomUUID } = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { Pool } = require("pg");
-const budget = require("../api/lib/public-model-budget");
-const { summarizeLedger, seedBlockedBudget } = require("../api/lib/public-model-ledger");
+const budget = require("../lib/public-model-budget");
+const { summarizeLedger, seedBlockedBudget } = require("../lib/public-model-ledger");
 const { createHandler } = require("../api/model-preview");
 
 function databaseUrl() {

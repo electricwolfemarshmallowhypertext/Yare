@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const budget = require("../api/lib/public-model-budget");
+const budget = require("../lib/public-model-budget");
 const { createHandler } = require("../api/model-preview");
 
 function fakeResponse() {

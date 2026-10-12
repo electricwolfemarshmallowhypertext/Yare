@@ -13,6 +13,7 @@ import psycopg
 
 from cli.yare import compile_lead_state
 from cli.storage import _hash_json
+from cli import integrity
 from producers.nemotron import Budget, OpenShellRepo, TokenFactory, coding_loop, read_settings, save_json
 
 TASK = "Evidence-based claim classification with case and whitespace normalization"
@@ -64,9 +65,12 @@ def load_handoff(database_url, run_id):
     if not row or not isinstance(row[2], dict):
         raise ValueError("Durable handoff rows missing")
     state_hash, state, packet, receipt_hash, receipt = row
-    material = {key: value for key, value in packet.items() if key != "deterministic_hash"}
-    if packet.get("deterministic_hash") != state_hash or _hash_json(material) != state_hash:
+    if isinstance(receipt, dict) and "packet_snapshot" in receipt:
+        packet = receipt["packet_snapshot"]
+    if packet.get("deterministic_hash") != state_hash or integrity.state_hash(packet) != state_hash:
         raise ValueError("Stored handoff state hash mismatch")
+    if packet.get("hash_version") == "work-state.v2" and receipt.get("packet_hash") != integrity.digest(packet):
+        raise ValueError("Stored handoff packet hash mismatch")
     if packet.get("current_state") != state:
         raise ValueError("Stored handoff state content mismatch")
     if not isinstance(receipt, dict) or receipt.get("receipt_hash") != receipt_hash:
@@ -213,5 +217,19 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as error:
-        print("handoff phase FAIL:", type(error).__name__)
+        messages = {
+            "Stored handoff state hash mismatch": "HANDOFF_STATE_HASH_MISMATCH",
+            "Stored handoff state content mismatch": "HANDOFF_STATE_CONTENT_MISMATCH",
+            "Stored handoff receipt hash mismatch": "HANDOFF_RECEIPT_HASH_MISMATCH",
+            "Stored handoff source hash mismatch": "HANDOFF_SOURCE_HASH_MISMATCH",
+            "Stored handoff packet hash mismatch": "HANDOFF_PACKET_HASH_MISMATCH",
+            "Stored handoff source artifact is ambiguous or missing": "HANDOFF_SOURCE_MISSING",
+            "Durable handoff rows missing": "HANDOFF_NOT_FOUND",
+        }
+        code = messages.get(str(error), "HANDOFF_FAILURE")
+        if isinstance(error, FileNotFoundError):
+            code = "HANDOFF_RESOURCE_MISSING"
+        elif isinstance(error, PermissionError):
+            code = "HANDOFF_PERMISSION_DENIED"
+        print("handoff phase FAIL:", code)
         raise SystemExit(1)

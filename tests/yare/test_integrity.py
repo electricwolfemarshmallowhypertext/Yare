@@ -126,7 +126,8 @@ def test_timeline_selects_newest_then_displays_in_order_with_task_filter():
                                    connect_func=lambda url: Connection(cursor))
     assert [row["state_hash"] for row in rows] == ["previous", "latest"]
     sql, params = cursor.calls[0]
-    assert "ORDER BY cs.created_at DESC" in sql
+    assert "FROM yare_events" in sql
+    assert "ORDER BY created_at DESC, receipt_hash DESC" in sql
     assert params == ("task", "task", 2)
 
 
@@ -135,7 +136,8 @@ def test_latest_diff_selects_only_states_of_the_same_task():
     diff = storage.latest_memory_diff(task="task", database_url="stub",
                                      connect_func=lambda url: Connection(cursor))
     assert diff["latest_state_hash"] == "latest"
-    assert "WHERE COALESCE(cs.packet_json->>'task', r.task) = COALESCE" in cursor.calls[0][0]
+    assert "FROM yare_events" in cursor.calls[0][0]
+    assert "WHERE task = COALESCE" in cursor.calls[0][0]
     assert cursor.calls[0][1] == ("task",)
 
 
@@ -168,5 +170,5 @@ def test_persistence_saves_the_full_packet_as_an_immutable_source_snapshot():
     storage.persist_lead_compile(packet, [], {}, database_url="stub", connect_func=lambda url: Connection(cursor))
     statement, params = next(call for call in cursor.calls if "INSERT INTO yare_current_states" in call[0])
     assert json.loads(params[3]) == packet
-    assert "packet_json = COALESCE" in statement
+    assert "ON CONFLICT (current_state_hash) DO NOTHING" in statement
     assert "state_json = excluded" not in statement

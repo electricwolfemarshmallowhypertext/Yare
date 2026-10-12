@@ -1,4 +1,15 @@
 # Memory System Development Guide
+
+## Supported Yare Upgrade
+
+Use `nebius-upgrade` for the supported coding-handoff release; `main` preserves the earlier release and is not merged automatically. Production follows `nebius-upgrade`.
+
+Install CLI dependencies with `python -m pip install -r requirements-cli.txt`, then run `python -m cli.yare doctor`. CI runs this before installing pytest, so a separately installed YAML dependency cannot hide an incomplete quickstart.
+
+Supported automated checks are `python -m pytest -q tests/` and the Node tests in `tests/site/*.cjs` and `site/tests/*.test.js`. CI runs them on both upgrade branches and pull requests. Cloud checks require explicitly configured access and are separate from offline fixtures.
+
+The older `apps/api/tests` suite belongs to the legacy API stack, requires its own `apps/api/requirements.txt` dependencies, and is not included in the supported Yare CLI/producer/site CI job. The older setup instructions below apply to that stack, not the CLI quickstart.
+
 Created: 2025-11-02 20:06:54
 Author: electricwolfemarshmallowhypertext
 

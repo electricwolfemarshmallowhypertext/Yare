@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { summarizeLedger, seedBlockedBudget } = require("../api/lib/public-model-ledger");
+const { summarizeLedger, seedBlockedBudget } = require("../lib/public-model-ledger");
 
 test("summarizes charges without changing ledger entries", () => {
   const state = { limit_usd: "5", max_calls: 500, max_tokens: 2000000,

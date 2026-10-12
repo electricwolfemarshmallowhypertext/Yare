@@ -5,6 +5,7 @@ import json
 import os
 import re
 from typing import Any, Callable
+from cli import integrity
 
 DATABASE_URL_ENV = "YARE_DATABASE_URL"
 VECTOR_DIMENSIONS = 32
@@ -15,6 +16,8 @@ SCHEMA_TABLES = (
     "yare_current_states",
     "yare_receipts",
     "yare_memory_vectors",
+    "yare_run_snapshots",
+    "yare_events",
 )
 
 SCHEMA_SQL = (
@@ -70,6 +73,36 @@ SCHEMA_SQL = (
         VECTOR INDEX yare_memory_vectors_embedding_idx (embedding vector_cosine_ops)
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS yare_run_snapshots (
+        run_id TEXT NOT NULL REFERENCES yare_runs(run_id),
+        current_state_hash TEXT NOT NULL,
+        packet_json JSONB NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        PRIMARY KEY (run_id, current_state_hash)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS yare_events (
+        receipt_hash TEXT PRIMARY KEY REFERENCES yare_receipts(receipt_hash),
+        run_id TEXT NOT NULL REFERENCES yare_runs(run_id),
+        current_state_hash TEXT NOT NULL,
+        task TEXT NOT NULL,
+        packet_json JSONB NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        INDEX yare_events_task_time (task, created_at DESC)
+    )
+    """,
+    """
+    INSERT INTO yare_events (receipt_hash, run_id, current_state_hash, task, packet_json, created_at)
+    SELECT rec.receipt_hash, rec.run_id, rec.current_state_hash,
+           COALESCE(cs.packet_json->>'task', r.task),
+           COALESCE(rec.receipt_json->'packet_snapshot', cs.packet_json,
+             jsonb_build_object('task', r.task, 'current_state', cs.state_json)), rec.created_at
+    FROM yare_receipts rec JOIN yare_current_states cs ON cs.current_state_hash = rec.current_state_hash
+    JOIN yare_runs r ON r.run_id = rec.run_id
+    ON CONFLICT (receipt_hash) DO NOTHING
+    """,
 )
 
 SECTION_KEYS = (
@@ -110,7 +143,7 @@ def _connect(database_url: str) -> Any:
         import psycopg  # type: ignore
     except ImportError as e:
         raise StorageError("psycopg is required for CockroachDB persistence") from e
-    return psycopg.connect(database_url)
+    return psycopg.connect(database_url, connect_timeout=15)
 
 
 def _jsonb(value: Any) -> str:
@@ -119,6 +152,79 @@ def _jsonb(value: Any) -> str:
 
 def _hash_json(value: Any) -> str:
     return hashlib.sha256(_jsonb(value).encode("utf-8")).hexdigest()
+
+
+def verify_handoff_record(row: Any) -> dict[str, Any]:
+    run_id, state_hash, state, packet, receipt_hash, receipt = row
+    if not isinstance(receipt, dict) or receipt.get("receipt_hash") != receipt_hash:
+        raise StorageError("handoff_receipt_missing")
+    if isinstance(receipt, dict) and "packet_snapshot" in receipt:
+        packet = receipt["packet_snapshot"]
+    if not isinstance(packet, dict) or packet.get("deterministic_hash") != state_hash:
+        raise StorageError("handoff_packet_missing")
+    if integrity.state_hash(packet) != state_hash:
+        raise StorageError("handoff_state_hash_mismatch")
+    if packet.get("hash_version") == "work-state.v2" and receipt.get("packet_hash") != integrity.digest(packet):
+        raise StorageError("handoff_packet_hash_mismatch")
+    if packet.get("current_state") != state:
+        raise StorageError("handoff_state_content_mismatch")
+    if (_hash_json({key: value for key, value in receipt.items() if key != "receipt_hash"}) != receipt_hash
+            or receipt.get("run_id") != run_id or receipt.get("current_state_hash") != state_hash):
+        raise StorageError("handoff_receipt_hash_mismatch")
+    artifacts = packet.get("artifacts")
+    if not isinstance(artifacts, list):
+        raise StorageError("handoff_artifacts_missing")
+    for artifact in artifacts:
+        if not isinstance(artifact, dict):
+            raise StorageError("handoff_artifact_invalid")
+        evidence = artifact.get("evidence") or {}
+        if not isinstance(evidence, dict):
+            raise StorageError("handoff_evidence_invalid")
+        if "source_code" in evidence or "source_sha256" in evidence:
+            source = evidence.get("source_code")
+            if not isinstance(source, str) or hashlib.sha256(source.encode("utf-8")).hexdigest() != evidence.get("source_sha256"):
+                raise StorageError("handoff_source_hash_mismatch")
+    return {"run_id": run_id, "task": packet.get("task"), "current_state_hash": state_hash,
+            "current_state": state, "artifacts": artifacts, "receipt_hash": receipt_hash,
+            "receipt": receipt, "verified": True}
+
+
+def load_handoff(*, task: str | None = None, run_id: str | None = None,
+                 state_hash: str | None = None, database_url: str | None = None,
+                 connect_func: Callable[[str], Any] | None = None) -> dict[str, Any]:
+    if not any((task, run_id, state_hash)):
+        raise StorageError("handoff_selector_required")
+    url = _database_url(database_url)
+    if not url:
+        raise StorageError("YARE_DATABASE_URL is required")
+    clauses, values = [], []
+    for value, clause in ((run_id, "cs.run_id = %s"), (state_hash, "cs.current_state_hash = %s"),
+                          (task, "COALESCE(cs.packet_json->>'task', r.task) = %s")):
+        if value:
+            clauses.append(clause)
+            values.append(value)
+    try:
+        with (connect_func or _connect)(url) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT cs.run_id, cs.current_state_hash, cs.state_json,
+                           COALESCE(cs.packet_json, CASE WHEN r.current_state_hash = cs.current_state_hash
+                             THEN r.compiled_state_json END), rec.receipt_hash, rec.receipt_json
+                    FROM yare_current_states cs JOIN yare_runs r ON r.run_id = cs.run_id
+                    JOIN yare_receipts rec ON rec.run_id = cs.run_id
+                      AND rec.current_state_hash = cs.current_state_hash
+                    WHERE """ + " AND ".join(clauses) + """
+                    ORDER BY rec.created_at DESC, rec.receipt_hash DESC,
+                             cs.created_at DESC, cs.current_state_hash DESC LIMIT 1
+                """, tuple(values))
+                row = cur.fetchone()
+        if row is None:
+            raise StorageError("handoff_not_found")
+        return verify_handoff_record(row)
+    except StorageError:
+        raise
+    except Exception as exc:
+        raise StorageError("handoff_database_read_failed") from exc
 
 
 def _run_schema(cur: Any) -> None:
@@ -267,6 +373,10 @@ def diff_states(previous: dict[str, Any], latest: dict[str, Any]) -> dict[str, A
     latest_contradictions = set(_state_list(latest_state, "what_contradicts_prior_state"))
     prev_approvals = set(_state_list(previous_state, "what_needs_human_approval"))
     latest_approvals = set(_state_list(latest_state, "what_needs_human_approval"))
+    prev_files = set(_state_list(previous_state, "what_changed"))
+    latest_files = set(_state_list(latest_state, "what_changed"))
+    prev_loops = set(_state_list(previous_state, "open_loops"))
+    latest_loops = set(_state_list(latest_state, "open_loops"))
     previous_action = str(previous_state.get("next_clean_action") or "")
     latest_action = str(latest_state.get("next_clean_action") or "")
     disappeared = prev_unresolved - latest_unresolved
@@ -290,6 +400,10 @@ def diff_states(previous: dict[str, Any], latest: dict[str, Any]) -> dict[str, A
         "new_contradictions": sorted(latest_contradictions - prev_contradictions),
         "cleared_contradictions": sorted(prev_contradictions - latest_contradictions),
         "new_approval_items": sorted(latest_approvals - prev_approvals),
+        "new_files": sorted(latest_files - prev_files),
+        "removed_files": sorted(prev_files - latest_files),
+        "new_open_loops": sorted(latest_loops - prev_loops),
+        "removed_open_loops": sorted(prev_loops - latest_loops),
         "next_clean_action_previous": previous_action,
         "next_clean_action_latest": latest_action,
         "next_clean_action_changed": previous_action != latest_action,
@@ -357,12 +471,6 @@ def persist_lead_compile(
 
     try:
         with connector(url) as conn:
-            if hasattr(conn, "autocommit"):
-                conn.autocommit = True
-            with conn.cursor() as cur:
-                _run_schema(cur)
-            if hasattr(conn, "autocommit"):
-                conn.autocommit = False
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -374,11 +482,7 @@ def persist_lead_compile(
                         source_artifact_hashes
                     )
                     VALUES (%s, %s, %s, %s::jsonb, %s::jsonb)
-                    ON CONFLICT (run_id) DO UPDATE SET
-                        task = excluded.task,
-                        current_state_hash = excluded.current_state_hash,
-                        compiled_state_json = excluded.compiled_state_json,
-                        source_artifact_hashes = excluded.source_artifact_hashes
+                    ON CONFLICT (run_id) DO NOTHING
                     """,
                     (run_id, task, current_state_hash, _jsonb(packet), _jsonb(artifact_rows)),
                 )
@@ -386,8 +490,7 @@ def persist_lead_compile(
                     """
                     INSERT INTO yare_current_states (current_state_hash, run_id, state_json, packet_json)
                     VALUES (%s, %s, %s::jsonb, %s::jsonb)
-                    ON CONFLICT (current_state_hash) DO UPDATE SET
-                        packet_json = COALESCE(yare_current_states.packet_json, excluded.packet_json)
+                    ON CONFLICT (current_state_hash) DO NOTHING
                     """,
                     (current_state_hash, run_id, _jsonb(packet.get("current_state") or {}), _jsonb(packet)),
                 )
@@ -401,9 +504,7 @@ def persist_lead_compile(
                             artifact_json
                         )
                         VALUES (%s, %s, %s, %s::jsonb)
-                        ON CONFLICT (run_id, source_artifact) DO UPDATE SET
-                            artifact_hash = excluded.artifact_hash,
-                            artifact_json = excluded.artifact_json
+                        ON CONFLICT (run_id, source_artifact) DO NOTHING
                         """,
                         (
                             run_id,
@@ -421,10 +522,7 @@ def persist_lead_compile(
                         receipt_json
                     )
                     VALUES (%s, %s, %s, %s::jsonb)
-                    ON CONFLICT (receipt_hash) DO UPDATE SET
-                        run_id = excluded.run_id,
-                        current_state_hash = excluded.current_state_hash,
-                        receipt_json = excluded.receipt_json
+                    ON CONFLICT (receipt_hash) DO NOTHING
                     """,
                     (receipt_hash, run_id, current_state_hash, _jsonb(receipt)),
                 )
@@ -439,10 +537,7 @@ def persist_lead_compile(
                             embedding
                         )
                         VALUES (%s, %s, %s, %s, %s::VECTOR)
-                        ON CONFLICT (current_state_hash, section_name) DO UPDATE SET
-                            run_id = excluded.run_id,
-                            source_text = excluded.source_text,
-                            embedding = excluded.embedding
+                        ON CONFLICT (current_state_hash, section_name) DO NOTHING
                         """,
                         (
                             run_id,
@@ -452,13 +547,33 @@ def persist_lead_compile(
                             row["embedding"],
                         ),
                     )
+                cur.execute("""INSERT INTO yare_run_snapshots (run_id, current_state_hash, packet_json)
+                    VALUES (%s, %s, %s::jsonb) ON CONFLICT (run_id, current_state_hash) DO NOTHING""",
+                    (run_id, current_state_hash, _jsonb(packet)))
+                cur.execute("""INSERT INTO yare_events (receipt_hash, run_id, current_state_hash, task, packet_json)
+                    VALUES (%s, %s, %s, %s, %s::jsonb) ON CONFLICT (receipt_hash) DO NOTHING""",
+                    (receipt_hash, run_id, current_state_hash, task, _jsonb(packet)))
             conn.commit()
     except StorageError:
         raise
     except Exception as e:
-        raise StorageError(f"lead_compile_persist_failed: {e}") from e
+        raise StorageError("lead_compile_persist_failed") from e
 
     return True
+
+
+def _search_sections(query: str) -> set[str]:
+    words = set(re.findall(r"[a-z0-9]+", query.lower()))
+    sections: set[str] = set()
+    if (words & {"review", "approval", "approve", "approved"}
+            or {"sign", "off"} <= words
+            or (words & {"person", "human"} and words & {"blocked", "waiting", "pending"})):
+        sections.add("human approval items")
+    if words & {"file", "files"} and words & {"changed", "modified", "edited"}:
+        sections.add("what changed")
+    if words & {"unfinished", "remaining", "blocked", "waiting"}:
+        sections.add("open loops")
+    return sections
 
 
 def search_memory(
@@ -466,6 +581,7 @@ def search_memory(
     limit: int,
     database_url: str | None = None,
     connect_func: Callable[[str], Any] | None = None,
+    task: str | None = None,
 ) -> list[dict[str, Any]]:
     url = _database_url(database_url)
     if not url:
@@ -476,33 +592,46 @@ def search_memory(
     connector = connect_func or _connect
     query_vector = _vector_literal(embed_text(query))
     terms = set(_tokens(query)) - SEARCH_STOP_WORDS
+    preferred_sections = _search_sections(query)
+    for section in preferred_sections:
+        terms.update(set(_tokens(section)) - SEARCH_STOP_WORDS)
     if not terms:
         raise StorageError("memory_search_query_invalid: enter a meaningful query")
     candidate_limit = min(max(limit * 10, 50), 500)
+    scope_sql = ""
+    scope_args: tuple[Any, ...] = ()
+    if task is not None:
+        scope_sql = """current_state_hash IN (
+            SELECT cs.current_state_hash FROM yare_current_states cs
+            JOIN yare_runs r ON r.run_id = cs.run_id
+            WHERE COALESCE(cs.packet_json->>'task', r.task) = %s)"""
+        scope_args = (task,)
     try:
         with connector(url) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    """
+                    f"""
                     SELECT
                         section_name,
                         embedding <=> %s::VECTOR AS distance,
                         current_state_hash,
                         source_text
                     FROM yare_memory_vectors
+                    {('WHERE ' + scope_sql) if scope_sql else ''}
                     ORDER BY embedding <=> %s::VECTOR
                     LIMIT %s
                     """,
-                    (query_vector, query_vector, candidate_limit),
+                    (query_vector, *scope_args, query_vector, candidate_limit),
                 )
-                rows = cur.fetchall()
+                rows = list(cur.fetchall())
                 matches = " OR ".join("LOWER(section_name || ' ' || source_text) LIKE %s" for _ in terms)
                 cur.execute(
                     f"""SELECT section_name, embedding <=> %s::VECTOR AS distance,
                                current_state_hash, source_text
-                        FROM yare_memory_vectors WHERE {matches}
+                        FROM yare_memory_vectors WHERE ({matches})
+                        {('AND ' + scope_sql) if scope_sql else ''}
                         ORDER BY created_at DESC, current_state_hash DESC LIMIT %s""",
-                    (query_vector, *(f"%{term}%" for term in sorted(terms)), candidate_limit),
+                    (query_vector, *(f"%{term}%" for term in sorted(terms)), *scope_args, candidate_limit),
                 )
                 rows.extend(cur.fetchall())
     except StorageError:
@@ -510,15 +639,16 @@ def search_memory(
     except Exception as e:
         raise StorageError(f"memory_search_failed: {e}") from e
 
-    def rank(row: Any) -> tuple[int, int, float, str]:
+    def rank(row: Any) -> tuple[int, int, int, float, str]:
         section_terms = set(_tokens(str(row[0]))) - SEARCH_STOP_WORDS
         text_terms = set(_tokens(str(row[3]))) - SEARCH_STOP_WORDS
-        return (-len(terms & section_terms), -len(terms & text_terms), float(row[1]), str(row[2]))
+        return (-int(str(row[0]).lower() in preferred_sections),
+                -len(terms & section_terms), -len(terms & text_terms), float(row[1]), str(row[2]))
 
     unique = {}
     for row in sorted(rows, key=rank):
-        section_overlap, text_overlap, _, _ = rank(row)
-        if section_overlap == 0 and text_overlap == 0:
+        section_match, section_overlap, text_overlap, _, _ = rank(row)
+        if section_match == 0 and section_overlap == 0 and text_overlap == 0:
             continue
         key = (str(row[0]), str(row[3]).strip().casefold())
         unique.setdefault(key, row)
@@ -553,22 +683,11 @@ def memory_timeline(
                 cur.execute(
                     """
                     SELECT
-                        cs.current_state_hash,
-                        cs.created_at,
-                        COALESCE(cs.packet_json->>'task', r.task, ''),
-                        cs.run_id,
-                        COALESCE((
-                            SELECT yr.receipt_hash
-                            FROM yare_receipts yr
-                            WHERE yr.current_state_hash = cs.current_state_hash
-                            ORDER BY yr.created_at DESC
-                            LIMIT 1
-                        ), ''),
-                        cs.state_json
-                    FROM yare_current_states cs
-                    LEFT JOIN yare_runs r ON r.run_id = cs.run_id
-                    WHERE (%s::TEXT IS NULL OR COALESCE(cs.packet_json->>'task', r.task) = %s)
-                    ORDER BY cs.created_at DESC, cs.current_state_hash DESC
+                        current_state_hash, created_at, task, run_id, receipt_hash,
+                        packet_json->'current_state'
+                    FROM yare_events
+                    WHERE (%s::TEXT IS NULL OR task = %s)
+                    ORDER BY created_at DESC, receipt_hash DESC
                     LIMIT %s
                     """,
                     (task, task, limit),
@@ -598,27 +717,14 @@ def latest_memory_diff(
                 cur.execute(
                     """
                     SELECT
-                        cs.current_state_hash,
-                        cs.created_at,
-                        COALESCE(cs.packet_json->>'task', r.task, ''),
-                        cs.run_id,
-                        COALESCE((
-                            SELECT yr.receipt_hash
-                            FROM yare_receipts yr
-                            WHERE yr.current_state_hash = cs.current_state_hash
-                            ORDER BY yr.created_at DESC
-                            LIMIT 1
-                        ), ''),
-                        cs.state_json
-                    FROM yare_current_states cs
-                    LEFT JOIN yare_runs r ON r.run_id = cs.run_id
-                    WHERE COALESCE(cs.packet_json->>'task', r.task) = COALESCE(%s::TEXT, (
-                        SELECT COALESCE(newest.packet_json->>'task', nr.task)
-                        FROM yare_current_states newest
-                        JOIN yare_runs nr ON nr.run_id = newest.run_id
-                        ORDER BY newest.created_at DESC, newest.current_state_hash DESC LIMIT 1
+                        current_state_hash, created_at, task, run_id, receipt_hash,
+                        packet_json->'current_state'
+                    FROM yare_events
+                    WHERE task = COALESCE(%s::TEXT, (
+                        SELECT task FROM yare_events
+                        ORDER BY created_at DESC, receipt_hash DESC LIMIT 1
                     ))
-                    ORDER BY cs.created_at DESC, cs.current_state_hash DESC
+                    ORDER BY created_at DESC, receipt_hash DESC
                     LIMIT 2
                     """, (task,)
                 )

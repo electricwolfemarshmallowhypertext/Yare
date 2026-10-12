@@ -96,7 +96,7 @@ class Connection:
 @pytest.mark.parametrize("bad_row", [None, 0, 1, 2, 3, 4, 5, 6, 7])
 def test_database_read_back_checks_every_table(sample, bad_row):
     packet, receipt = sample
-    rows = [(packet, list(reversed(storage._artifact_rows(packet["artifacts"])))), (packet["current_state"], packet), (receipt,),
+    rows = [(packet, receipt["receipt_hash"]), (packet["current_state"], packet), (receipt,),
             [(a["source_artifact"], bench.digest(a), a) for a in packet["artifacts"]],
             [(v["section_name"], v["source_text"]) for v in storage.memory_vector_rows(packet)],
             ("yare_memory_vectors", "VECTOR INDEX yare_memory_vectors_embedding_idx (embedding vector_cosine_ops)"),

@@ -1,5 +1,5 @@
 const fs = require("node:fs");
-const { summarizeLedger } = require("../api/lib/public-model-ledger");
+const { summarizeLedger } = require("../lib/public-model-ledger");
 
 if (process.argv.length !== 3) {
   process.stderr.write("Usage: node site/scripts/public-budget-dry-run.js <ignored-ledger-path>\n");

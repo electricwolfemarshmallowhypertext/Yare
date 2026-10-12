@@ -1,5 +1,5 @@
 const { randomUUID } = require("node:crypto");
-const budget = require("./lib/public-model-budget");
+const budget = require("../lib/public-model-budget");
 
 const NANO = "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B";
 let pool;

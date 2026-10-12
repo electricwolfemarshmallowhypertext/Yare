@@ -17,7 +17,9 @@ test("demo renders and copies actual patch/test evidence; failed reload disables
   const document = { getElementById(id) { return elements[id] ||= element(); }, createElement: element };
   const testResult = { command: ["python", "-m", "unittest"], exit_code: 0, stdout: "", stderr: "Ran 6 tests\nOK" };
   const phase = { run_id: "run", current_state_hash: "state", receipt_hash: "receipt", patch: "+real patch",
-    targeted_test: testResult, full_test: testResult, handoff: { next_clean_action: "Review" },
+    targeted_test: testResult, full_test: testResult, handoff: { next_clean_action: "Review",
+      what_changed: ["workstate.py"], what_is_true: [], what_is_unverified: [],
+      what_contradicts_prior_state: [], what_needs_human_approval: [], open_loops: [] },
     access: { policy_allows_read: true, exit_code: 0, source_sha256: "snapshot" }, assessment: null };
   const data = { task: "Recorded task", a: { ...phase, full_test: { ...testResult, exit_code: 1, stderr: "FAILED (failures=2)" } },
     b: phase, scope: "Recorded scope", summary_source: "Stored evidence" };
@@ -28,9 +30,13 @@ test("demo renders and copies actual patch/test evidence; failed reload disables
     fetch: async () => ({ ok: healthy, json: async () => data }) });
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../../site/demo.js"), "utf8"), context);
   await elements.loadHandoff.listeners.click();
-  assert.match(elements.handoffText.textContent, /\+real patch/);
-  assert.match(elements.handoffText.textContent, /FAILED \(failures=2\)/);
-  assert.match(elements.handoffText.textContent, /Ran 6 tests/);
+  assert.match(elements.handoffText.textContent, /2 test failures remained/);
+  assert.match(elements.handoffText.textContent, /All 6 tests passed/);
+  assert.doesNotMatch(elements.handoffText.textContent, /\+real patch/);
+  const evidence = elements.handoffSections.children.filter(node => node.className === "evidence-details");
+  assert.ok(evidence.some(node => node.children[1].textContent.includes("+real patch")));
+  assert.ok(evidence.some(node => node.children[1].textContent.includes("FAILED (failures=2)")));
+  assert.ok(evidence.every(node => !node.open));
   assert.equal(elements.copyHandoff.disabled, false);
   await elements.copyHandoff.listeners.click();
   assert.equal(copied, elements.handoffText.textContent);

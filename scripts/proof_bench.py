@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 from cli import archive, storage, yare
+from cli import integrity
 
 
 class BenchFailure(ValueError):
@@ -25,8 +26,11 @@ def digest(value):
 
 def verify_local(packet, receipt, previous_state=None, previous_receipt=None):
     state_hash = packet.get("deterministic_hash")
-    require(state_hash == digest({k: v for k, v in packet.items() if k != "deterministic_hash"}),
+    require(state_hash == integrity.state_hash(packet),
             "state hash mismatch")
+    if packet.get("hash_version") == "work-state.v2":
+        require(receipt.get("packet_snapshot") == packet and receipt.get("packet_hash") == digest(packet),
+                "packet snapshot mismatch")
     require(receipt.get("receipt_hash") == digest({k: v for k, v in receipt.items() if k != "receipt_hash"}),
             "receipt hash mismatch")
     require(receipt.get("current_state_hash") == state_hash, "receipt names another state")
@@ -74,21 +78,25 @@ def verify_database(packet, receipt, connect):
     state_hash = packet["deterministic_hash"]
     with connect() as connection:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT compiled_state_json, source_artifact_hashes FROM yare_runs WHERE run_id = %s",
-                           (run_id,))
+            cursor.execute("SELECT e.packet_json, e.receipt_hash FROM yare_events e "
+                           "JOIN yare_runs r ON r.run_id = e.run_id "
+                           "WHERE e.run_id = %s AND e.receipt_hash = %s AND e.current_state_hash = %s",
+                           (run_id, receipt["receipt_hash"], state_hash))
             run = cursor.fetchone()
             require(run is not None and run[0] == packet, "Cockroach run packet read-back mismatch")
-            expected_hashes = storage._artifact_rows(packet["artifacts"])
-            require(sorted(run[1], key=lambda item: item["source_artifact"]) ==
-                    sorted(expected_hashes, key=lambda item: item["source_artifact"]),
-                    "Cockroach source hashes read-back mismatch")
+            require(run[1] == receipt["receipt_hash"], "Cockroach event receipt read-back mismatch")
             cursor.execute("SELECT state_json, packet_json FROM yare_current_states WHERE current_state_hash = %s",
                            (state_hash,))
-            require(cursor.fetchone() == (packet["current_state"], packet), "Cockroach state read-back mismatch")
+            stored_state = cursor.fetchone()
+            require(stored_state is not None and stored_state[0] == packet["current_state"]
+                    and isinstance(stored_state[1], dict)
+                    and integrity.state_hash(stored_state[1]) == state_hash,
+                    "Cockroach state read-back mismatch")
             cursor.execute("SELECT receipt_json FROM yare_receipts WHERE receipt_hash = %s", (receipt["receipt_hash"],))
             require(cursor.fetchone() == (receipt,), "Cockroach receipt read-back mismatch")
-            cursor.execute("SELECT source_artifact, artifact_hash, artifact_json FROM yare_lead_artifacts WHERE run_id = %s",
-                           (run_id,))
+            cursor.execute("SELECT source_artifact, artifact_hash, artifact_json FROM yare_lead_artifacts "
+                           "WHERE run_id = %s AND source_artifact = ANY(%s)",
+                           (run_id, [a["source_artifact"] for a in packet["artifacts"]]))
             expected = sorted((a["source_artifact"], digest(a), a) for a in packet["artifacts"])
             require(sorted(cursor.fetchall(), key=lambda row: row[0]) == expected,
                     "Cockroach artifact read-back mismatch")

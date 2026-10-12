@@ -553,7 +553,7 @@ def test_lead_compile_template_artifact_compiles(ws: Path) -> None:
     assert payload["proof"]["run_id"] == "template-run-001"
 
 
-def test_skill_apply_edit_accepts_and_writes_receipt(ws: Path) -> None:
+def test_skill_apply_edit_rejects_unsupported_improvement_scores(ws: Path) -> None:
     scaffold_workspace(ws)
     edit_path = ws / "accepted-edit.json"
     edit_path.write_text(
@@ -582,17 +582,54 @@ def test_skill_apply_edit_accepts_and_writes_receipt(ws: Path) -> None:
 
     result = runner.invoke(app, ["skill", "apply-edit", "--root", str(ws), "--edit", str(edit_path)])
     assert result.exit_code == 0
-    assert "decision: accepted" in result.stdout
+    assert "decision: rejected" in result.stdout
 
     skill_body = (ws / "skills" / "s1" / "SKILL.md").read_text(encoding="utf-8")
-    assert "validation gates." in skill_body
+    assert "validation gates." not in skill_body
 
-    receipt_files = sorted((ws / ".sticky" / "skill-receipts").glob("*.jsonl"))
+    receipt_files = sorted((ws / ".sticky" / "rejected-skill-edits").glob("*.jsonl"))
     assert receipt_files
     receipt = json.loads(receipt_files[-1].read_text(encoding="utf-8").strip())
-    assert receipt["decision"] == "accepted"
+    assert receipt["decision"] == "rejected"
+    assert receipt["reason_code"] == "skill_edit_independent_evaluation_required"
     assert receipt["score_delta"] > 0
-    assert receipt["old_hash"] != receipt["new_hash"]
+    assert receipt["old_hash"] == receipt["new_hash"]
+
+
+@pytest.mark.parametrize("target_path", ["AGENTS.md", "../outside.md", "skills/../AGENTS.md", "absolute"])
+def test_skill_apply_edit_rejects_outside_skills(ws: Path, target_path: str) -> None:
+    scaffold_workspace(ws)
+    protected = ws / "AGENTS.md"
+    original = protected.read_text(encoding="utf-8")
+    payload = json.loads((REPO_ROOT / "examples/skill-optimization/accepted-edit.json").read_text())
+    payload.update(skill_path=str(protected) if target_path == "absolute" else target_path,
+                   target="# Agents", replacement="# Overwritten")
+    edit_path = ws / "edit.json"
+    edit_path.write_text(json.dumps(payload), encoding="utf-8")
+    result = runner.invoke(app, ["skill", "apply-edit", "--root", str(ws), "--edit", str(edit_path)])
+    assert result.exit_code != 0
+    assert "skill_edit_invalid_skill_path" in result.stdout
+    assert protected.read_text(encoding="utf-8") == original
+    assert not list((ws / ".sticky/skill-receipts").glob("*.jsonl"))
+
+
+def test_skill_apply_edit_rejects_symlink_escape(ws: Path) -> None:
+    scaffold_workspace(ws)
+    protected = ws / "AGENTS.md"
+    original = protected.read_text(encoding="utf-8")
+    link = ws / "skills/s1/escape.md"
+    try:
+        link.symlink_to(protected)
+    except OSError:
+        pytest.skip("Creating symlinks is unavailable on this system")
+    payload = json.loads((REPO_ROOT / "examples/skill-optimization/accepted-edit.json").read_text())
+    payload.update(skill_path="skills/s1/escape.md", target="# Agents", replacement="# Overwritten")
+    edit_path = ws / "edit.json"
+    edit_path.write_text(json.dumps(payload), encoding="utf-8")
+    result = runner.invoke(app, ["skill", "apply-edit", "--root", str(ws), "--edit", str(edit_path)])
+    assert result.exit_code != 0
+    assert "skill_edit_invalid_skill_path" in result.stdout
+    assert protected.read_text(encoding="utf-8") == original
 
 
 def test_skill_apply_edit_rejects_and_writes_rejection_record(ws: Path) -> None:
@@ -886,10 +923,8 @@ def test_storage_persist_executes_schema_and_inserts_with_stubbed_connection() -
     sql = "\n".join(call[0] for call in calls)
     assert persisted is True
     assert connections[0].commits == 1
-    assert "CREATE TABLE IF NOT EXISTS yare_runs" in sql
-    assert "CREATE TABLE IF NOT EXISTS yare_lead_artifacts" in sql
-    assert "CREATE TABLE IF NOT EXISTS yare_current_states" in sql
-    assert "CREATE TABLE IF NOT EXISTS yare_receipts" in sql
+    assert "CREATE TABLE" not in sql
+    assert "SET CLUSTER" not in sql
     assert "INSERT INTO yare_runs" in sql
     assert "INSERT INTO yare_lead_artifacts" in sql
     assert "INSERT INTO yare_current_states" in sql
@@ -929,8 +964,8 @@ def test_storage_persist_writes_memory_vectors_with_stubbed_connection() -> None
     sql = "\n".join(call[0] for call in calls)
     vector_params = [params for statement, params in calls if "INSERT INTO yare_memory_vectors" in statement]
     assert persisted is True
-    assert "CREATE TABLE IF NOT EXISTS yare_memory_vectors" in sql
-    assert "VECTOR INDEX yare_memory_vectors_embedding_idx" in sql
+    assert "CREATE TABLE" not in sql
+    assert "CREATE VECTOR INDEX" not in sql
     assert len(vector_params) == 7
     assert vector_params[0][2] == "what changed"
     assert vector_params[-1][2] == "next clean action"

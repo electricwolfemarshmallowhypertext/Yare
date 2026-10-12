@@ -116,10 +116,12 @@ for (const [name, mutate] of [
   });
 }
 
-test("correctly hashed private publication fields are rejected", async () => {
+for (const privatePath of ["C:\\Users\\private\\secret.py", "\\\\server\\private\\secret.py",
+  "file:///private/secret.py", "/home/private/secret.py", "/root/secret.py"]) {
+test(`correctly hashed private publication field is rejected: ${privatePath}`, async () => {
   const data = fixture();
   const row = data.rows['run-a'];
-  row.packet_json.artifacts[0].evidence.diff = "C:\\Users\\private\\secret.py";
+  row.packet_json.artifacts[0].evidence.diff = privatePath;
   delete row.packet_json.deterministic_hash;
   row.packet_json.deterministic_hash = hash(row.packet_json);
   row.current_state_hash = row.packet_json.deterministic_hash;
@@ -133,4 +135,17 @@ test("correctly hashed private publication fields are rejected", async () => {
     approved: data.approved, poolFor: () => ({ query: async (_sql, params) => ({ rows: [data.rows[params[0]]] }) })
   })({ method: "GET" }, res);
   assert.equal(res.statusCode, 503);
+});
+}
+
+test("private data in an unprojected identifier cannot bypass the final response guard", async () => {
+  const data = fixture();
+  data.rows['run-a'].created_at = "C:\\private\\record";
+  const res = response();
+  await createHandler({ env: { YARE_PUBLIC_UPGRADE_ENABLED: "true", YARE_DATABASE_URL: "stub" },
+    approved: data.approved, poolFor: () => ({ query: async (_sql, params) => ({ rows: [data.rows[params[0]]] }) })
+  })({ method: "GET" }, res);
+  assert.equal(res.statusCode, 503);
+  assert.equal(res.body.code, "PUBLICATION_REJECTED");
+  assert.ok(!JSON.stringify(res.body).includes("private\\record"));
 });

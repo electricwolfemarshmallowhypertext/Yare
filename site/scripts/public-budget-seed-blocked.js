@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const { createHash } = require("node:crypto");
 const { Pool } = require("pg");
-const { summarizeLedger, seedBlockedBudget } = require("../api/lib/public-model-ledger");
+const { summarizeLedger, seedBlockedBudget } = require("../lib/public-model-ledger");
 
 async function main() {
   if (process.argv.length !== 3 || process.env.YARE_PUBLIC_MODEL_ENABLED === "true" ||

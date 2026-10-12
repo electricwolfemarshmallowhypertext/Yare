@@ -15,8 +15,12 @@ import yaml
 
 from cli import archive as archive_backend
 from cli import storage as storage_backend
+from cli import integrity
+from cli import skill_evaluation
 
 app = typer.Typer(add_completion=False, help="Yare context governance runtime CLI")
+handoff_app = typer.Typer(help="Read and verify saved handoffs")
+app.add_typer(handoff_app, name="handoff")
 lead_app = typer.Typer(add_completion=False, help="Yare handoff primitives")
 skill_app = typer.Typer(add_completion=False, help="Skill optimization gates")
 storage_app = typer.Typer(add_completion=False, help="CockroachDB durable memory storage")
@@ -64,9 +68,9 @@ STOPWORDS = {
 }
 
 ADAPTER_INSTRUCTIONS = {
-    "codex": "codex --task \"{task}\" --context-file \"{context_file}\"",
-    "claude": "claude code --prompt \"{task}\" --context-file \"{context_file}\"",
-    "gemini": "gemini --prompt \"{task}\" --context-file \"{context_file}\"",
+    "codex": "codex \"Read {context_file} before starting. {task}\"",
+    "claude": "claude \"Read {context_file} before starting. {task}\"",
+    "gemini": "gemini \"Read {context_file} before starting. {task}\"",
 }
 
 LEAD_ARTIFACT_SCHEMA_FILE = "schemas/lead-artifact.schema.json"
@@ -213,6 +217,7 @@ def _normalize_reference(raw_ref: str) -> str:
 
 
 def _check_jsonl(path: Path) -> tuple[bool, str]:
+    idx = 0
     try:
         for idx, line in enumerate(_load_text(path).splitlines(), start=1):
             if not line.strip():
@@ -220,7 +225,7 @@ def _check_jsonl(path: Path) -> tuple[bool, str]:
             json.loads(line)
         return True, ""
     except Exception as e:
-        return False, f"line {idx}: {e}"  # type: ignore[name-defined]
+        return False, f"line {idx}: {type(e).__name__}"
 
 
 def _discover_context_files(root: Path) -> dict[str, list[Path]]:
@@ -736,13 +741,22 @@ def apply_skill_edit(root: Path, edit_path: Path) -> tuple[str, Path, dict[str, 
     if not skill_path_raw:
         raise ValueError("skill_edit_invalid_skill_path")
     skill_path = Path(skill_path_raw)
-    skill_file = skill_path if skill_path.is_absolute() else (root / skill_path)
-    skill_file = skill_file.resolve()
+    if skill_path.is_absolute() or skill_path.drive or skill_path.root or ".." in skill_path.parts:
+        raise ValueError("skill_edit_invalid_skill_path: use a relative path inside skills")
+    workspace = root.resolve()
+    skills_dir = (workspace / "skills").resolve()
+    skill_file = (workspace / skill_path).resolve()
+    if skills_dir != workspace / "skills" or not skill_file.is_relative_to(skills_dir):
+        raise ValueError("skill_edit_invalid_skill_path: target must stay inside skills")
     if not skill_file.exists() or not skill_file.is_file():
         raise ValueError(f"skill_file_missing: {_display_path(root, skill_file)}")
 
-    old_text = _load_text(skill_file)
-    old_hash = _sha256_file(skill_file)
+    old_bytes = skill_file.read_bytes()
+    old_text = old_bytes.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+    old_hash = hashlib.sha256(old_bytes).hexdigest()
+    expected_old_hash = edit_payload.get("old_hash")
+    if expected_old_hash is not None and expected_old_hash != old_hash:
+        raise ValueError("skill_edit_source_changed")
 
     edit_type = str(edit_payload.get("edit_type") or "").strip()
     target = str(edit_payload.get("target") or "")
@@ -757,11 +771,17 @@ def apply_skill_edit(root: Path, edit_path: Path) -> tuple[str, Path, dict[str, 
         new_text = _apply_bounded_skill_edit(old_text, edit_type, target, replacement)
         tmp_path.write_text(new_text, encoding="utf-8")
         proposed_hash = _sha256_file(tmp_path)
+        evaluation = (skill_evaluation.evaluate(workspace, skill_file, tmp_path,
+                                                str(edit_payload["validation_task"]))
+                      if expected_old_hash is not None else None)
+        if evaluation and (evaluation["baseline"]["skill_sha256"] != old_hash
+                           or evaluation["proposed"]["skill_sha256"] != proposed_hash):
+            raise ValueError("skill_edit_evaluation_input_mismatch")
 
-    baseline_score = float(edit_payload.get("baseline_score"))
-    validation_score = float(edit_payload.get("validation_score"))
+    baseline_score = evaluation["baseline"]["score"] if evaluation else float(edit_payload["baseline_score"])
+    validation_score = evaluation["proposed"]["score"] if evaluation else float(edit_payload["validation_score"])
     score_delta = validation_score - baseline_score
-    accepted = validation_score > baseline_score
+    accepted = evaluation is not None and expected_old_hash == old_hash and validation_score > baseline_score
 
     edit_material = json.dumps(edit_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     edit_hash = hashlib.sha256(edit_material).hexdigest()
@@ -769,6 +789,11 @@ def apply_skill_edit(root: Path, edit_path: Path) -> tuple[str, Path, dict[str, 
     base_record = {
         "timestamp": _utc_now_iso(),
         "decision": "accepted" if accepted else "rejected",
+        "reason_code": ("skill_edit_independent_evaluation_required" if evaluation is None
+                        else "skill_edit_original_hash_required" if expected_old_hash is None
+                        else "skill_edit_improved" if accepted else "skill_edit_not_improved"),
+        "evaluation": evaluation,
+        "scores_verified": evaluation is not None,
         "schema_version": str(edit_payload.get("schema_version")),
         "skill_id": str(edit_payload.get("skill_id")),
         "skill_path": _display_path(root, skill_file),
@@ -790,11 +815,24 @@ def apply_skill_edit(root: Path, edit_path: Path) -> tuple[str, Path, dict[str, 
     }
 
     if accepted:
-        skill_file.write_text(new_text, encoding="utf-8")
-        base_record["new_hash"] = _sha256_file(skill_file)
+        if skill_file.resolve() != skill_file or _sha256_file(skill_file) != old_hash:
+            raise ValueError("skill_edit_source_changed")
+        pending_path = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=skill_file.parent,
+                                             prefix=".yare-edit-", suffix=".tmp", delete=False) as pending:
+                pending_path = Path(pending.name)
+                pending.write(new_text)
+            if _sha256_file(pending_path) != proposed_hash:
+                raise ValueError("skill_edit_candidate_changed")
+            if skill_file.resolve() != skill_file or _sha256_file(skill_file) != old_hash:
+                raise ValueError("skill_edit_source_changed")
+            pending_path.replace(skill_file)
+        finally:
+            if pending_path is not None:
+                pending_path.unlink(missing_ok=True)
         receipt_path = _write_skill_gate_record(root, "skill-receipts", base_record)
         return "accepted", receipt_path, base_record
-
     rejection_path = _write_skill_gate_record(root, "rejected-skill-edits", base_record)
     return "rejected", rejection_path, base_record
 
@@ -850,13 +888,14 @@ def _lead_dedupe_sorted(items: list[str]) -> list[str]:
 def _lead_load_artifacts_from_file(root: Path, path: Path) -> tuple[list[tuple[dict[str, Any], str]], list[str]]:
     records: list[tuple[dict[str, Any], str]] = []
     warnings: list[str] = []
-    source = _display_path(root, path)
+    source = path.name
     if not path.exists() or not path.is_file():
         warnings.append(f"artifact_missing: {source}")
         return records, warnings
 
     try:
         text = _load_text(path)
+        source = f"{path.name}@sha256:{_sha256_file(path)}"
     except Exception as e:
         warnings.append(f"artifact_read_error: {source} ({e})")
         return records, warnings
@@ -1195,7 +1234,7 @@ def _lead_normalize_artifact(raw: dict[str, Any], source_ref: str, index: int) -
         run_id = str(raw.get("receipt_hash") or "").strip()
     if not run_id:
         material = json.dumps(raw, sort_keys=True, separators=(",", ":")).encode("utf-8")
-        run_id = hashlib.sha256(material + f"{source_ref}:{index}".encode("utf-8")).hexdigest()[:16]
+        run_id = hashlib.sha256(material + f":{index}".encode("utf-8")).hexdigest()[:16]
 
     normalized = {
         "run_id": run_id,
@@ -1230,11 +1269,9 @@ def _lead_collect_artifact_paths(root: Path, explicit: list[Path]) -> list[Path]
         return unique
 
     discovered: list[Path] = []
-    discovered.extend(sorted((root / "receipts").glob("*.jsonl")))
-    discovered.extend(sorted((root / ".sticky" / "receipts").glob("*.jsonl")))
-    resolved = root / ".yare" / "resolved-context.json"
-    if resolved.exists():
-        discovered.append(resolved)
+    for folder in (root / ".yare" / "captures", root / "lead-artifacts"):
+        discovered.extend(sorted(folder.glob("*.json")))
+        discovered.extend(sorted(folder.glob("*.jsonl")))
     unique = sorted({str(p.resolve()): p.resolve() for p in discovered}.values(), key=lambda p: str(p).lower())
     return unique
 
@@ -1304,7 +1341,7 @@ def _lead_compile_packet(root: Path, artifacts: list[dict[str, Any]], task_overr
                 contradictions.append(text)
 
     for key, statuses in claim_statuses.items():
-        if "verified" in statuses and ("contradicted" in statuses or "unverified" in statuses or "unknown" in statuses):
+        if "verified" in statuses and "contradicted" in statuses:
             contradictions.append(claim_original[key])
 
     contradictions.extend([c for a in artifacts_sorted for c in a.get("contradictions", [])])
@@ -1331,7 +1368,8 @@ def _lead_compile_packet(root: Path, artifacts: list[dict[str, Any]], task_overr
         needs_human_approval = _lead_dedupe_sorted(needs_human_approval)
 
     true_claims = _lead_dedupe_sorted(true_claims)
-    unverified_claims = _lead_dedupe_sorted(unverified_claims)
+    supported_keys = {text.lower() for text in true_claims}
+    unverified_claims = _lead_dedupe_sorted([text for text in unverified_claims if text.lower() not in supported_keys])
 
     next_clean_action = "Proceed to the next scoped task."
     if needs_human_approval:
@@ -1410,8 +1448,8 @@ def _lead_compile_packet(root: Path, artifacts: list[dict[str, Any]], task_overr
         },
     }
 
-    material = json.dumps(packet, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    packet["deterministic_hash"] = hashlib.sha256(material).hexdigest()
+    packet["hash_version"] = "work-state.v2"
+    packet["deterministic_hash"] = integrity.state_hash(packet)
     return packet
 
 
@@ -1484,6 +1522,7 @@ def _lead_write_receipt(
     packet: dict[str, Any],
     command_run: str,
     receipt_evidence: dict[str, Any] | None = None,
+    write: bool = True,
 ) -> tuple[Path, dict[str, Any]]:
     proof = packet.get("proof", {})
     git_state = proof.get("git_state", {})
@@ -1508,15 +1547,32 @@ def _lead_write_receipt(
     }
     if receipt_evidence is not None:
         receipt["access_evidence"] = receipt_evidence
+    if packet.get("hash_version") == "work-state.v2":
+        receipt["packet_snapshot"] = packet
+        receipt["packet_hash"] = integrity.digest(packet)
     material = json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode("utf-8")
     receipt["receipt_hash"] = hashlib.sha256(material).hexdigest()
 
     receipts_dir = root / ".sticky" / "receipts"
-    receipts_dir.mkdir(parents=True, exist_ok=True)
     filename = timestamp.strftime("%Y%m%dT%H%M%S%fZ.jsonl")
     out_path = receipts_dir / filename
-    out_path.write_text(json.dumps(receipt) + "\n", encoding="utf-8")
+    if write:
+        _atomic_write(out_path, json.dumps(receipt) + "\n")
     return out_path, receipt
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pending_path = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                         prefix=".yare-", suffix=".tmp", delete=False) as pending:
+            pending_path = Path(pending.name)
+            pending.write(text)
+        pending_path.replace(path)
+    finally:
+        if pending_path is not None:
+            pending_path.unlink(missing_ok=True)
 
 
 def compile_lead_state(
@@ -1559,21 +1615,32 @@ def compile_lead_state(
                 validation["warnings"] = merged
 
     sticky_dir = root / ".sticky"
-    sticky_dir.mkdir(parents=True, exist_ok=True)
     json_path = sticky_dir / "current-state.json"
     md_path = sticky_dir / "current-state.md"
-    json_path.write_text(json.dumps(packet, indent=2), encoding="utf-8")
-    md_path.write_text(_lead_current_state_markdown(packet), encoding="utf-8")
-
     receipt_path, receipt = _lead_write_receipt(
-        root, packet, command_run="yare lead compile", receipt_evidence=receipt_evidence)
-    storage_backend.persist_lead_compile(packet=packet, artifacts=artifacts, receipt=receipt)
-    s3_uris = archive_backend.archive_lead_compile(
-        packet=packet,
-        json_path=json_path,
-        md_path=md_path,
-        receipt_path=receipt_path,
-    )
+        root, packet, command_run="yare lead compile", receipt_evidence=receipt_evidence, write=False)
+    try:
+        persisted = storage_backend.persist_lead_compile(packet=packet, artifacts=artifacts, receipt=receipt)
+    except storage_backend.StorageError as exc:
+        raise storage_backend.StorageError(
+            "lead_compile_persist_unconfirmed: cockroach=unconfirmed; local=unchanged; s3=skipped") from exc
+    database_status = "committed" if persisted else "not configured"
+    try:
+        _atomic_write(json_path, json.dumps(packet, indent=2))
+        _atomic_write(md_path, _lead_current_state_markdown(packet))
+        _atomic_write(receipt_path, json.dumps(receipt) + "\n")
+    except OSError as exc:
+        raise ValueError(f"lead_compile_partial: cockroach={database_status}; local=failed; archive=skipped") from exc
+    s3_uris = []
+    archive_status = "not configured"
+    try:
+        s3_uris = archive_backend.archive_lead_compile(
+            packet=packet, json_path=json_path, md_path=md_path, receipt_path=receipt_path)
+        if s3_uris:
+            archive_status = "uploaded"
+    except archive_backend.ArchiveError:
+        archive_status = "incomplete; retry archive from retained local files"
+    typer.echo(f"persistence: cockroach={database_status}; local=written; s3={archive_status}", err=True)
     return packet, json_path, md_path, receipt_path, receipt, s3_uris
 
 
@@ -1588,13 +1655,43 @@ def storage_init() -> None:
     typer.echo(f"tables: {', '.join(storage_backend.SCHEMA_TABLES)}")
 
 
+@handoff_app.command("load")
+def handoff_load(
+    task: str | None = typer.Option(None, "--task"),
+    run_id: str | None = typer.Option(None, "--run-id"),
+    state_hash: str | None = typer.Option(None, "--state-hash"),
+    verify: bool = typer.Option(True, "--verify/--no-verify", help="Integrity verification is required"),
+) -> None:
+    if not verify:
+        typer.echo("handoff_verification_required")
+        raise typer.Exit(code=1)
+    try:
+        result = storage_backend.load_handoff(task=task, run_id=run_id, state_hash=state_hash)
+    except storage_backend.StorageError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1)
+    typer.echo(json.dumps(result, indent=2))
+
+
+@app.command("verify")
+def verify_state(state_hash: str = typer.Argument(...)) -> None:
+    try:
+        result = storage_backend.load_handoff(state_hash=state_hash)
+    except storage_backend.StorageError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1)
+    typer.echo(f"handoff: verified\nstate_hash: {result['current_state_hash']}\nreceipt_hash: {result['receipt_hash']}")
+
+
 @memory_app.command("search")
 def memory_search(
     query: str = typer.Option(..., "--query", help="Search query for prior agent memory"),
     limit: int = typer.Option(3, "--limit", min=1, help="Maximum results to return"),
+    task: str | None = typer.Option(None, "--task", help="Search only this task's saved memory"),
 ) -> None:
     try:
-        results = storage_backend.search_memory(query=query, limit=limit)
+        results = storage_backend.search_memory(query=query, limit=limit,
+                                                **({"task": task} if task is not None else {}))
     except storage_backend.StorageError as e:
         typer.echo(str(e))
         raise typer.Exit(code=1)
@@ -1629,7 +1726,7 @@ def memory_timeline(
         typer.echo("memory_timeline: no states")
         return
 
-    for row in rows:
+    for index, row in enumerate(rows):
         typer.echo(f"state_hash: {row['state_hash']}")
         typer.echo(f"created_at: {row['created_at']}")
         typer.echo(f"task: {row['task']}")
@@ -1641,7 +1738,7 @@ def memory_timeline(
         typer.echo(f"contradictions_count: {row['contradictions_count']}")
         typer.echo(f"human_approval_count: {row['human_approval_count']}")
         typer.echo(f"next_clean_action: {row['next_clean_action']}")
-        if row != rows[-1]:
+        if index != len(rows) - 1:
             typer.echo("")
 
 
@@ -1680,6 +1777,8 @@ def memory_diff(
     _echo_list("new_contradictions", diff["new_contradictions"])
     _echo_list("cleared_contradictions", diff["cleared_contradictions"])
     _echo_list("new_approval_items", diff["new_approval_items"])
+    for key in ("new_files", "removed_files", "new_open_loops", "removed_open_loops"):
+        _echo_list(key, diff.get(key, []))
     if diff["next_clean_action_changed"]:
         typer.echo(
             "next_clean_action_changed: "
