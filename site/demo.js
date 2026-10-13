@@ -68,6 +68,7 @@ function render(data) {
   ]);
   addSection("What Yare saved", [
     "The code change, actual test output and remaining work were stored in CockroachDB.",
+    ...data.a.handoff.what_contradicts_prior_state.map(claim => `Disproved by the full-suite results: ${claim}.`),
     ...data.a.handoff.what_is_unverified.map(claim => `Not confirmed: ${claim}.`),
     ...data.a.handoff.open_loops.map(loop => `Still to do: ${typeof loop === "string" ? loop : loop.text}.`)
   ]);
@@ -89,7 +90,13 @@ function render(data) {
   addEvidence("A: saved partial patch", data.a.patch);
   addEvidence("A: targeted tests", testText(data.a.targeted_test));
   addEvidence("A: full-suite failures", testText(data.a.full_test));
-  addEvidence("Stored Yare handoff from A", JSON.stringify(data.a.handoff, null, 2));
+  addEvidence("Stored Yare handoff from A (original record)", JSON.stringify(data.a.recorded_handoff || data.a.handoff, null, 2));
+  if (data.a.classification_corrections?.length) {
+    addEvidence("Evidence-based classification correction", JSON.stringify({
+      corrections: data.a.classification_corrections, handoff: data.a.handoff,
+      note: "Corrected view derived from the recorded full-suite output; original stored record and hashes are unchanged."
+    }, null, 2));
+  }
   if (data.b.assessment) {
     addEvidence("B: recorded handoff assessment (agent statement)", JSON.stringify(data.b.assessment, null, 2));
   }
@@ -114,7 +121,8 @@ function render(data) {
     "What the tests show", `First agent, focused checks: ${testResult(data.a.targeted_test)}`,
     `First agent, full checks: ${testResult(data.a.full_test)}`,
     `Next agent, full checks: ${testResult(data.b.full_test)}`, "",
-    "What was not confirmed in the first handoff", lines(data.a.handoff.what_is_unverified), "",
+    "What the first agent's test results disproved", lines(data.a.handoff.what_contradicts_prior_state), "",
+    "What remains unverified from the first handoff", lines(data.a.handoff.what_is_unverified), "",
     "What is still unverified", lines(finalState.what_is_unverified), "",
     "Contradictions", lines(finalState.what_contradicts_prior_state), "",
     "Needs human review", lines(finalState.what_needs_human_approval), "",

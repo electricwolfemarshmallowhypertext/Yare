@@ -21,7 +21,9 @@ test("demo renders and copies actual patch/test evidence; failed reload disables
       what_changed: ["workstate.py"], what_is_true: [], what_is_unverified: [],
       what_contradicts_prior_state: [], what_needs_human_approval: [], open_loops: [] },
     access: { policy_allows_read: true, exit_code: 0, source_sha256: "snapshot" }, assessment: null };
-  const data = { task: "Recorded task", a: { ...phase, full_test: { ...testResult, exit_code: 1, stderr: "FAILED (failures=2)" } },
+  const data = { task: "Recorded task", a: { ...phase,
+    handoff: { ...phase.handoff, what_contradicts_prior_state: ["All full-suite tests passed"] },
+    full_test: { ...testResult, exit_code: 1, stderr: "FAILED (failures=2)" } },
     b: phase, scope: "Recorded scope", summary_source: "Stored evidence" };
   let healthy = true;
   let copied;
@@ -32,6 +34,7 @@ test("demo renders and copies actual patch/test evidence; failed reload disables
   await elements.loadHandoff.listeners.click();
   assert.match(elements.handoffText.textContent, /2 test failures remained/);
   assert.match(elements.handoffText.textContent, /All 6 tests passed/);
+  assert.match(elements.handoffText.textContent, /What the first agent's test results disproved\n- All full-suite tests passed/);
   assert.doesNotMatch(elements.handoffText.textContent, /\+real patch/);
   const evidence = elements.handoffSections.children.filter(node => node.className === "evidence-details");
   assert.ok(evidence.some(node => node.children[1].textContent.includes("+real patch")));

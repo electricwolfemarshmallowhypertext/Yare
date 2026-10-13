@@ -85,6 +85,35 @@ test("a missing approved record fails closed", async () => {
   assert.equal(res.statusCode, 404);
 });
 
+test("recorded test failures contradict the full-suite passing claim without rewriting stored evidence", async () => {
+  const data = fixture();
+  const row = data.rows['run-a'];
+  row.state_json.what_is_unverified = ["All full-suite tests passed", "Unrelated claim"];
+  row.state_json.what_contradicts_prior_state = [];
+  delete row.packet_json.deterministic_hash;
+  row.packet_json.deterministic_hash = hash(row.packet_json);
+  row.current_state_hash = row.packet_json.deterministic_hash;
+  row.receipt_json.current_state_hash = row.current_state_hash;
+  delete row.receipt_json.receipt_hash;
+  row.receipt_json.receipt_hash = hash(row.receipt_json);
+  row.receipt_hash = row.receipt_json.receipt_hash;
+  data.approved.a = { run_id: row.run_id, current_state_hash: row.current_state_hash, receipt_hash: row.receipt_hash };
+  const before = JSON.stringify(row);
+  const res = response();
+  await createHandler({ env: { YARE_PUBLIC_UPGRADE_ENABLED: "true", YARE_DATABASE_URL: "stub" },
+    approved: data.approved, poolFor: () => ({ query: async (_sql, params) => ({ rows: [data.rows[params[0]]] }) })
+  })({ method: "GET" }, res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(res.body.a.handoff.what_is_unverified, ["Unrelated claim"]);
+  assert.deepEqual(res.body.a.handoff.what_contradicts_prior_state, ["All full-suite tests passed"]);
+  assert.deepEqual(res.body.a.recorded_handoff.what_is_unverified, ["All full-suite tests passed", "Unrelated claim"]);
+  assert.equal(res.body.a.classification_corrections[0].corrected_status, "contradicted");
+  assert.equal(res.body.a.classification_corrections[0].evidence_ref, "full_test");
+  assert.equal(res.body.a.handoff_basis, "evidence_corrected_view");
+  assert.equal(res.body.a.current_state_hash, row.current_state_hash);
+  assert.equal(JSON.stringify(row), before);
+});
+
 test("a receipt without stored evidence fails closed", async () => {
   const res = response();
   await createHandler({

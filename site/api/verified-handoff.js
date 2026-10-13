@@ -85,10 +85,33 @@ function evidenceFor(row) {
   if (typeof access.policy_allows_read !== "boolean" || !Number.isInteger(access.exit_code)) {
     throw Error("stored access decision missing");
   }
+  const fullTest = publicTest(evidence.full_test);
+  const handoff = { ...state };
+  const corrections = [];
+  const failedSuite = fullTest.exit_code !== 0 &&
+    /\bFAILED\s*\([^)]*(?:failures|errors)=[1-9]\d*[^)]*\)/.test(`${fullTest.stdout}\n${fullTest.stderr}`);
+  if (failedSuite) {
+    for (const [key, status] of [["what_is_true", "verified"], ["what_is_unverified", "unverified"]]) {
+      const values = Array.isArray(state[key]) ? state[key] : [];
+      const contradicted = values.filter(claim => /^all full[- ]suite tests passed[.!]?$/i.test(claim.trim()));
+      if (!contradicted.length) continue;
+      handoff[key] = values.filter(claim => !contradicted.includes(claim));
+      const previous = Array.isArray(handoff.what_contradicts_prior_state) ? handoff.what_contradicts_prior_state : [];
+      handoff.what_contradicts_prior_state = [...new Set([...previous, ...contradicted])];
+      for (const claim of contradicted) {
+        corrections.push({ claim, recorded_status: status, corrected_status: "contradicted",
+          evidence_ref: "full_test", observed_exit_code: fullTest.exit_code,
+          reason: "The recorded full-suite output reports failing tests." });
+      }
+    }
+    if (corrections.length) handoff.next_clean_action = "Fix the failing full-suite tests, then rerun the full suite.";
+  }
   return {
     task: publicText(packet.task), patch: publicText(evidence.diff), source_sha256: evidence.source_sha256,
-    targeted_test: publicTest(evidence.partial_test), full_test: publicTest(evidence.full_test),
-    handoff: state,
+    targeted_test: publicTest(evidence.partial_test), full_test: fullTest,
+    handoff, recorded_handoff: state, classification_corrections: corrections,
+    handoff_basis: corrections.length ? "evidence_corrected_view" : "recorded_state",
+    hash_basis: "original_stored_record",
     assessment: evidence.handoff_assessment ? {
       observed_exit_code: evidence.handoff_assessment.observed_exit_code,
       unverified_claim: publicText(evidence.handoff_assessment.unverified_claim),
@@ -189,7 +212,7 @@ function createHandler({ env = process.env, poolFor = getPool, approved = publis
       respond(res, 200, {
         task: runs.a.task,
         scope: approved.scope,
-        summary_source: "Recorded evidence loaded from CockroachDB; state, source and receipt hashes checked. No new agent run.",
+        summary_source: "Recorded evidence loaded from CockroachDB; original state, source and receipt hashes checked. Handoff classification is corrected against recorded test failures where applicable. No new agent run.",
         a: runs.a,
         b: runs.b
       });
