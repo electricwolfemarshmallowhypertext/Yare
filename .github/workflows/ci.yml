@@ -45,7 +45,8 @@ jobs:
 
       - name: Install site dependencies
         shell: pwsh
-        run: npm install --prefix site --ignore-scripts --no-package-lock
+        working-directory: site
+        run: npm install --ignore-scripts --no-package-lock
 
       - name: Run site and budget tests
         shell: pwsh
