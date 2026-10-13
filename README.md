@@ -2,11 +2,13 @@
 
 **Shared work memory for AI agents.**
 
+[Technical architecture](docs/ARCHITECTURE.md)
+
 ## What
 
-Yare gives the next agent a clear handoff: what changed, what is verified, what remains unresolved, and what to do next.
+Yare lets one AI coding agent hand unfinished work to another without losing the facts.
 
-It stores work state in CockroachDB with receipts that people and agents can inspect. A separate coding producer uses NVIDIA Nemotron through Nebius Token Factory to edit code and run tests inside OpenShell sandboxes.
+It saves code changes, actual test results, and remaining work in CockroachDB. The next agent can see what passed, what failed, and what still needs fixing instead of trusting the previous agent's claims.
 
 - [Try the read-only A/B demo](https://yare-vert.vercel.app/demo)
 - [Explore use cases](https://yare-vert.vercel.app/use-cases/)
@@ -14,13 +16,13 @@ It stores work state in CockroachDB with receipts that people and agents can ins
 
 ## Why
 
-AI coding work gets scattered across tools, conversations, code changes, and test logs. When another agent takes over, a summary alone can hide unfinished work or a failed test.
+AI coding work gets scattered across tools, conversations, code changes, and test logs. When another agent takes over, it needs more than a summary of what the previous agent says it did.
 
-Yare keeps actual test results, unverified claims, contradictions, approval items, and the next action together. The handoff survives a restart or a switch to another agent.
+Yare keeps the work and its evidence together so the next agent can pick up unfinished work and people can review the results.
 
-In the recorded A/B coding run, A passed four targeted tests but left two failures in the full suite. Fresh B loaded A's handoff from CockroachDB, fixed the remaining failures, and passed all six tests. OpenShell also allowed A and denied B access to the same sandboxed source snapshot while B worked in its separate copy.
+In one recorded coding task, the first agent passed four focused tests but left two failures in the full suite. A fresh agent loaded the saved handoff, finished the fix, and passed all six tests. This demonstrates that handoff on one task, not general autonomous coding performance.
 
-The public demo reads the saved patches, test output, handoffs, and receipt hashes from those approved records. It does not start a coding run. [Read the recorded result](docs/NEMOTRON_BOUNDARY_RESULT.md).
+The public demo shows the saved code changes and results from that task. It does not start a new agent run. [Read the recorded result](docs/NEMOTRON_BOUNDARY_RESULT.md).
 
 ## How
 
@@ -32,7 +34,9 @@ Agent code changes and test results
 -> next-agent handoff
 ```
 
-Yare remains model agnostic: it compiles work artifacts regardless of which tool produced them. CockroachDB stores the current state and history; vector search finds prior handoff sections, and timeline diffs show what changed. Managed MCP lets agent clients query the same memory. Optional S3 archiving preserves proof files, and local exports work without cloud credentials.
+An agent produces a work record containing its changes, test output, claims, and unfinished work. Yare checks that record, builds a handoff, and saves it with receipts in CockroachDB. The next agent loads the handoff and checks the saved code and record hashes before continuing.
+
+Yare stores the handoff; it is not the coding model. The separate coding producer uses NVIDIA Nemotron through Nebius Token Factory inside OpenShell sandboxes. Local exports are available without cloud credentials. S3 archiving is optional.
 
 Start locally:
 
@@ -67,7 +71,7 @@ python -m cli.yare memory timeline
 python -m cli.yare memory diff --latest
 ```
 
-Add `--task "your task"` to timeline or diff to inspect one task. Search combines vector distance with word and section matching, and removes duplicate results. Verified claims require linked test output or a recorded human review from a trusted source; Yare validates the record, not the identity of its author. Disputed claims stay outside confirmed facts. A claim disappearing from a later state is reported as removed, not resolved.
+Add `--task "your task"` to timeline or diff to inspect one task. The [technical architecture](docs/ARCHITECTURE.md) explains search, evidence checks, history, and their limits.
 
 The coding producer requires Token Factory credentials and a configured OpenShell runtime. Its [integration documentation](docs/NEBIUS_PROVIDER_ROUTING.md) and [A/B run commands](docs/NEMOTRON_BOUNDARY_RESULT.md#live-handoff) describe the tested path. `yare run` prints launch instructions; the separate producer executes coding runs. Public paid execution is disabled.
 
