@@ -6,6 +6,7 @@ const path = require("node:path");
 
 function element() {
   return { textContent: "", children: [], disabled: false, listeners: {},
+    setAttribute(name, value) { this[name] = value; },
     append(...nodes) { this.children.push(...nodes); },
     appendChild(node) { this.children.push(node); },
     replaceChildren(...nodes) { this.children = nodes; },
@@ -31,6 +32,7 @@ test("demo renders and copies actual patch/test evidence; failed reload disables
     navigator: { clipboard: { async writeText(text) { copied = text; } } },
     fetch: async () => ({ ok: healthy, json: async () => data }) });
   vm.runInContext(fs.readFileSync(path.join(__dirname, "../../site/demo.js"), "utf8"), context);
+  elements.viewPair.listeners.click();
   await elements.loadHandoff.listeners.click();
   assert.match(elements.handoffText.textContent, /2 test failures remained/);
   assert.match(elements.handoffText.textContent, /All 6 tests passed/);

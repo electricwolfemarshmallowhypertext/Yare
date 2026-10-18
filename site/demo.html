@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Yare | A Coding Handoff</title>
-  <meta name="description" content="A read-only view of a verified coding handoff stored in CockroachDB.">
+  <title>Yare | Four-Agent Handoff</title>
+  <meta name="description" content="One bounded, resumed four-agent chain after controller fixes. Read saved handoffs from CockroachDB.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Boogaloo&family=Inter:wght@300;400;600;700&family=Rubik+Mono+One&display=swap" rel="stylesheet">
@@ -18,7 +18,7 @@
       <a href="/proof">Proof</a>
       <a href="use-cases/">Use Cases</a>
       <a href="/demo">Demo</a>
-      <a href="https://github.com/electricwolfemarshmallowhypertext/Yare" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/electricwolfemarshmallowhypertext/Yare/tree/nebius-upgrade" target="_blank" rel="noopener">GitHub</a>
       <a href="https://github.com/electricwolfemarshmallowhypertext/Yare/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
     </div>
     <a class="nav-contact" href="mailto:smith@antiparty.co">Contact</a>
@@ -27,23 +27,28 @@
   <main class="demo-page">
     <header class="demo-hero">
       <span>RECORDED RUN · LIVE DATABASE</span>
-      <h1>One agent stopped. The next finished.</h1>
-      <p>Click <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mouse-pointer-click-icon lucide-mouse-pointer-click"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg> <strong>Load verified handoff</strong> to read two exact Yare records from <strong><a href="https://github.com/cockroachdb/cockroach" target="_blank" rel="noopener">CockroachDB</a></strong>.</p>
-      <p>Yare saved the first agent's code, failing tests and unfinished work. A fresh agent loaded that handoff from CockroachDB and completed the fix.</p>
-      <p>This is a recorded coding run. Loading it reads saved evidence; it does not start agents or make new model calls.</p>
+      <h1 id="demoTitle">Four agents. One saved chain.</h1>
+      <p>Click <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mouse-pointer-click-icon lucide-mouse-pointer-click"><path d="M14 4.1 12 6"/><path d="m5.1 8-2.9-.8"/><path d="m6 12-1.9 2"/><path d="M7.2 2.2 8 5.1"/><path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z"/></svg> <strong id="loadLabel">Load recorded chain</strong> to read the saved Yare records from <strong><a href="https://github.com/cockroachdb/cockroach" target="_blank" rel="noopener">CockroachDB</a></strong>.</p>
+      <p id="demoStory">Each agent picked one unfinished behavior, tested its change, and saved a handoff for a fresh agent.</p>
+      <p id="demoScope">One bounded, resumed four-agent chain after controller fixes. This is saved evidence, not a new model run.</p>
     </header>
 
+    <div class="demo-view-tabs" role="tablist" aria-label="Recorded runs">
+      <button type="button" role="tab" id="viewChain" aria-selected="true" aria-controls="handoffSections">Four-agent chain</button>
+      <button type="button" role="tab" id="viewPair" aria-selected="false" aria-controls="handoffSections">Earlier A/B run</button>
+    </div>
+
     <div class="demo-actions" aria-label="Demo actions">
-      <button class="hero-button primary" type="button" id="loadHandoff">Load verified handoff</button>
-      <button class="hero-button" type="button" id="copyHandoff" disabled>Copy handoff</button>
+      <button class="hero-button primary" type="button" id="loadHandoff">Load recorded chain</button>
+      <button class="hero-button" type="button" id="copyHandoff" disabled>Copy summary</button>
       <button class="hero-button" type="button" id="downloadJson" disabled>Download JSON</button>
-      <span class="demo-status" id="demoStatus">Waiting for verified handoff</span>
+      <span class="demo-status" id="demoStatus" role="status" aria-live="polite">Waiting for recorded chain</span>
     </div>
 
     <section class="meta-panel" aria-label="Live handoff metadata">
       <span class="meta-label">LIVE COCKROACHDB MEMORY</span>
       <h2 id="handoffTask">Load the handoff to see what happened.</h2>
-      <details class="evidence-details">
+      <details class="evidence-details" id="pairIdentifiers" hidden>
         <summary>Inspect saved record IDs and receipts</summary>
         <p>The artifacts were recompiled after the coding run to include recorded access decisions. These are saved records, not a new execution.</p>
       <div class="meta-grid">
@@ -73,11 +78,16 @@
         </div>
       </div>
       </details>
+      <details class="evidence-details" id="chainIdentifiers">
+        <summary>Inspect the four saved records and receipt links</summary>
+        <p>A's saved result was reused after controller fixes. Fresh B, C and D continued from it. The task brief stayed the same; this was not one uninterrupted attempt.</p>
+        <div class="meta-grid" id="chainRecordGrid"></div>
+      </details>
     </section>
 
-    <section class="demo-layout" aria-label="Live handoff viewer">
-      <div class="demo-panel" id="handoffSections">
-        <p class="demo-empty">Load the handoff to see what the first agent left unfinished and how the next agent completed it.</p>
+    <section class="demo-layout" aria-label="Recorded handoff viewer">
+      <div class="demo-panel" id="handoffSections" role="tabpanel" aria-labelledby="viewChain">
+        <p class="demo-empty">Load the recorded chain to see each agent's work and the final result.</p>
       </div>
 
       <pre id="handoffText" hidden>No handoff loaded.</pre>

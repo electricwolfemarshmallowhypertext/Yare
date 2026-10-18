@@ -1,0 +1,31 @@
+{
+  "scope": "One bounded, resumed four-agent chain after controller fixes",
+  "task": "Four-agent work-state utility handoff",
+  "brief_sha256": "bd44d8800fdfe2c74781205a1ce97a42f3f024b101b5965ca63a4a420f5e64f4",
+  "stages": [
+    {
+      "agent": "A",
+      "run_id": "nebius-chain-20261017-r3-a",
+      "current_state_hash": "0508a8ee53de771800156807af5bc0f92119dafd11792468c733097dfd17b9bf",
+      "receipt_hash": "0db4ef273b6fc34649101444cd957f1611d72c73cdddf2712036eca289bda27b"
+    },
+    {
+      "agent": "B",
+      "run_id": "nebius-chain-20261017-r5-b",
+      "current_state_hash": "4c5f64b24d5fcb6aa7a2a5506bf1cf5c6228a31833c0e3886756c3204a36fb8f",
+      "receipt_hash": "6044c517f2a7dab71f3652f2f66d116c4f9dd5a0916d85ff074084a78dec506d"
+    },
+    {
+      "agent": "C",
+      "run_id": "nebius-chain-20261017-r5-c",
+      "current_state_hash": "5fe86ae47980ad3c5dd0e15837445a4b721abc565fabc045249a49c1eb622c3d",
+      "receipt_hash": "7400fffa72f67d150ab61d27abd4e9c8a66671eb1d430ac7ae36d1e12d04c60c"
+    },
+    {
+      "agent": "D",
+      "run_id": "nebius-chain-20261017-r5-d",
+      "current_state_hash": "4d5cd023b82fe023e82816f423edcc6011586caaf5c9f6db9c49a30c7f176a0d",
+      "receipt_hash": "2418829ba48842816907a4aa21faeaefaa556b53e8b783ad0bc76f61b8f7ae12"
+    }
+  ]
+}

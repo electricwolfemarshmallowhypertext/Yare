@@ -1,0 +1,9 @@
+{
+  "basis": "Saved controller report; separate from the agent receipts",
+  "run_id": "nebius-chain-20261017-r5-d",
+  "current_state_hash": "4d5cd023b82fe023e82816f423edcc6011586caaf5c9f6db9c49a30c7f176a0d",
+  "receipt_hash": "2418829ba48842816907a4aa21faeaefaa556b53e8b783ad0bc76f61b8f7ae12",
+  "exit_code": 0,
+  "stdout": "{\"tests_run\": 8, \"failed_tests\": [], \"skipped\": 0}\n",
+  "stderr": "test_action_priority (__main__.AcceptanceTests.test_action_priority) ... ok\ntest_action_zero (__main__.AcceptanceTests.test_action_zero) ... ok\ntest_contradiction_with_evidence (__main__.AcceptanceTests.test_contradiction_with_evidence) ... ok\ntest_evidence_is_boolean (__main__.AcceptanceTests.test_evidence_is_boolean) ... ok\ntest_normalize_number (__main__.AcceptanceTests.test_normalize_number) ... ok\ntest_normalize_tabs (__main__.AcceptanceTests.test_normalize_tabs) ... ok\ntest_summary_no_mutation (__main__.AcceptanceTests.test_summary_no_mutation) ... ok\ntest_summary_unknowns (__main__.AcceptanceTests.test_summary_unknowns) ... ok\n\n----------------------------------------------------------------------\nRan 8 tests in 0.000s\n\nOK\n"
+}

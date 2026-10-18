@@ -51,6 +51,59 @@
       margin: 28px 0 34px;
     }
 
+    .demo-page [hidden] { display: none; }
+
+    .demo-view-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0;
+      border-bottom: 3px solid #000000;
+    }
+
+    .demo-view-tabs button {
+      min-height: 48px;
+      padding: 12px 18px;
+      border: 2px solid #000000;
+      border-bottom: 0;
+      background: var(--white);
+      color: #000000;
+      font: 600 15px "Inter", sans-serif;
+      cursor: pointer;
+    }
+
+    .demo-view-tabs button[aria-selected="true"] { background: var(--lime); }
+
+    .chain-timeline {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .chain-step {
+      display: grid;
+      grid-template-columns: 52px minmax(0, 1fr);
+      gap: 16px;
+      padding: 24px 0;
+      border-top: 2px solid #000000;
+      overflow-wrap: anywhere;
+    }
+
+    .chain-step > strong {
+      font: 400 30px "Rubik Mono One", sans-serif;
+      color: #000000;
+    }
+
+    .chain-step h3 { font-size: 22px; line-height: 1.2; margin-bottom: 10px; }
+    .chain-step p { font: 400 16px/1.5 "Inter", sans-serif; margin-top: 8px; }
+    .chain-result { font-weight: 700 !important; }
+
+    @media (max-width: 480px) {
+      .demo-view-tabs button { flex: 1; padding: 12px 8px; }
+      .chain-step { grid-template-columns: 32px minmax(0, 1fr); gap: 10px; }
+      .chain-step > strong { font-size: 24px; }
+      .chain-step h3 { font-size: 18px; }
+    }
+
     .demo-status {
       display: inline-flex;
       align-items: center;

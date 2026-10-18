@@ -6,6 +6,8 @@ const sectionsEl = document.getElementById("handoffSections");
 const handoffTextEl = document.getElementById("handoffText");
 
 let verifiedHandoff = null;
+let view = "chain";
+let requestId = 0;
 
 function setText(id, value) {
   document.getElementById(id).textContent = value || "none";
@@ -133,6 +135,116 @@ function render(data) {
   ].join("\n");
 }
 
+function renderChain(data) {
+  setText("handoffTask", "A fresh agent picked up each saved handoff");
+  const grid = document.getElementById("chainRecordGrid");
+  grid.replaceChildren();
+  const names = { normalize_status: "Clean up status text", classify_claim: "Check claims against evidence",
+    summarize_claims: "Count what is verified or unresolved", choose_next_action: "Choose what needs attention next" };
+  sectionsEl.replaceChildren();
+  addSection("What happened", [
+    "One fixed brief described four small coding behaviors. Each agent chose one unfinished behavior to implement.",
+    "Yare saved each change and its test results in CockroachDB. The next agent started fresh from that stored handoff.",
+    "A's successful record was reused after controller fixes; B, C and D then continued from it."
+  ]);
+  const timeline = document.createElement("ol");
+  timeline.className = "chain-timeline";
+  for (const stage of data.stages) {
+    const item = document.createElement("li");
+    item.className = "chain-step";
+    const letter = document.createElement("strong");
+    letter.textContent = stage.agent;
+    const body = document.createElement("div");
+    const heading = document.createElement("h3");
+    heading.textContent = names[stage.selected_function] || stage.selected_function;
+    const result = document.createElement("p");
+    result.className = "chain-result";
+    result.textContent = `${stage.test_summary.passed}/${stage.test_summary.total} checks passing after this agent`;
+    const continuity = document.createElement("p");
+    continuity.textContent = stage.parent_handoff
+      ? `Loaded ${String.fromCharCode(stage.agent.charCodeAt(0) - 1)}'s saved code and test evidence; then chose its next change.`
+      : "Started the task. Its verified saved result was reused for the continuation.";
+    body.append(heading, result, continuity);
+    item.append(letter, body);
+    timeline.appendChild(item);
+    for (const [label, value] of [["run ID", stage.run_id], ["state hash", stage.current_state_hash], ["receipt hash", stage.receipt_hash]]) {
+      const meta = document.createElement("div");
+      meta.className = "meta-item";
+      const title = document.createElement("span");
+      title.textContent = `${stage.agent} ${label}`;
+      const code = document.createElement("code");
+      code.textContent = value;
+      meta.append(title, code);
+      grid.appendChild(meta);
+    }
+  }
+  sectionsEl.appendChild(timeline);
+  addSection("The visible result", [
+    "All 16 task checks passed after D's change.",
+    "A separate verifier loaded D's saved code and passed 8 additional acceptance checks that were not shown to the coding agents.",
+    "Those 8 results are a separate saved controller report, not evidence bound into the agent receipts."
+  ]);
+  addSection("What this shows", [data.scope + ".",
+    "The controller limited each turn to one behavior. Agents chose their work and implementation; the controller handled tests and handoff packaging.",
+    "This is not indefinite autonomy or a broad coding benchmark. Loading the view makes no model calls."
+  ]);
+  const evidenceHeading = document.createElement("h2");
+  evidenceHeading.textContent = "Inspect the saved evidence";
+  sectionsEl.appendChild(evidenceHeading);
+  for (const stage of data.stages) {
+    addEvidence(`${stage.agent}: patch and tests`, [stage.patch, "Focused checks", testText(stage.targeted_test),
+      "Full suite after this change", testText(stage.full_test)].join("\n\n"));
+    addEvidence(`${stage.agent}: stored handoff and receipt link`, JSON.stringify({
+      run_id: stage.run_id, current_state_hash: stage.current_state_hash, receipt_hash: stage.receipt_hash,
+      source_sha256: stage.source_sha256, parent_handoff: stage.parent_handoff,
+      model: stage.coding_model, selection_reason: stage.selection_reason,
+      assessment: stage.assessment, handoff: stage.handoff
+    }, null, 2));
+  }
+  addEvidence("Separate verifier: 8 acceptance checks (saved controller report)", JSON.stringify(data.acceptance, null, 2));
+  handoffTextEl.textContent = ["Yare four-agent handoff", "", data.scope + ".", "",
+    "Each agent chose one unfinished coding behavior from the same brief. Yare saved its code and test evidence in CockroachDB before the next fresh agent continued.", "",
+    ...data.stages.map(stage => `Agent ${stage.agent}: ${names[stage.selected_function] || stage.selected_function}. ${stage.test_summary.passed}/${stage.test_summary.total} checks passing.`), "",
+    "Final result: 16/16 visible checks passed. A separate verifier passed 8/8 unseen acceptance checks on D's saved code.",
+    "The 8 acceptance results are a separate saved controller report, not bound into the agent receipts.", "",
+    "A's verified saved record was reused after controller fixes; fresh B, C and D continued from it. The controller limited each agent to one behavior per turn.",
+    "One bounded, resumed chain; not indefinite autonomy or a broad benchmark. Loading this evidence does not start agents or make model calls."
+  ].join("\n");
+}
+
+function setView(next) {
+  view = next;
+  requestId += 1;
+  verifiedHandoff = null;
+  copyButton.disabled = true;
+  downloadButton.disabled = true;
+  loadButton.disabled = false;
+  for (const [id, selected] of [["viewChain", view === "chain"], ["viewPair", view === "pair"]]) {
+    document.getElementById(id).setAttribute("aria-selected", String(selected));
+  }
+  document.getElementById("pairIdentifiers").hidden = view !== "pair";
+  document.getElementById("chainIdentifiers").hidden = view !== "chain";
+  sectionsEl.setAttribute("aria-labelledby", view === "chain" ? "viewChain" : "viewPair");
+  sectionsEl.replaceChildren();
+  document.getElementById("chainRecordGrid").replaceChildren();
+  for (const phase of ["a", "b"]) {
+    for (const field of ["RunId", "StateHash", "ReceiptHash"]) setText(phase + field, "none");
+  }
+  handoffTextEl.textContent = "No recorded run loaded.";
+  const label = view === "chain" ? "Load recorded chain" : "Load verified handoff";
+  loadButton.textContent = label;
+  setText("loadLabel", label);
+  setText("demoTitle", view === "chain" ? "Four agents. One saved chain." : "One agent stopped. The next finished.");
+  setText("demoStory", view === "chain"
+    ? "Each agent picked one unfinished behavior, tested its change, and saved a handoff for a fresh agent."
+    : "Yare saved the first agent's code, failing tests and unfinished work. A fresh agent loaded that handoff and completed the fix.");
+  setText("demoScope", view === "chain"
+    ? "One bounded, resumed four-agent chain after controller fixes. This is saved evidence, not a new model run."
+    : "One earlier recorded A/B task. Loading it reads saved evidence; it does not start agents or make new model calls.");
+  setText("handoffTask", view === "chain" ? "Load the chain to see each handoff." : "Load the handoff to see what happened.");
+  statusEl.textContent = view === "chain" ? "Waiting for recorded chain" : "Waiting for verified handoff";
+}
+
 async function copyText(value) {
   if (navigator.clipboard && window.isSecureContext) {
     await navigator.clipboard.writeText(value);
@@ -153,7 +265,7 @@ function downloadJson(payload) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = "verified-yare-handoff.json";
+  link.download = view === "chain" ? "verified-yare-chain.json" : "verified-yare-handoff.json";
   document.body.appendChild(link);
   link.click();
   link.remove();
@@ -161,27 +273,37 @@ function downloadJson(payload) {
 }
 
 loadButton.addEventListener("click", async () => {
+  const currentRequest = ++requestId;
+  const currentView = view;
   statusEl.textContent = "Loading verified CockroachDB records...";
   loadButton.disabled = true;
   verifiedHandoff = null;
   copyButton.disabled = true;
   downloadButton.disabled = true;
   try {
-    const response = await fetch("/api/verified-handoff");
+    const response = await fetch(currentView === "chain" ? "/api/verified-chain" : "/api/verified-handoff");
     if (!response.ok) throw new Error("Verified handoff is not available");
-    verifiedHandoff = await response.json();
-    render(verifiedHandoff);
+    const data = await response.json();
+    if (currentRequest !== requestId) return;
+    verifiedHandoff = data;
+    if (currentView === "chain") renderChain(data);
+    else render(data);
     copyButton.disabled = false;
     downloadButton.disabled = false;
-    statusEl.textContent = "Recorded handoff loaded from CockroachDB";
+    statusEl.textContent = currentView === "chain" ? "Four saved handoffs loaded from CockroachDB" : "Recorded handoff loaded from CockroachDB";
   } catch (error) {
+    if (currentRequest !== requestId) return;
     statusEl.textContent = error.message;
     sectionsEl.replaceChildren();
     handoffTextEl.textContent = error.message;
   } finally {
-    loadButton.disabled = false;
+    if (currentRequest === requestId) loadButton.disabled = false;
   }
 });
+
+document.getElementById("viewChain").addEventListener("click", () => setView("chain"));
+document.getElementById("viewPair").addEventListener("click", () => setView("pair"));
+setView("chain");
 
 copyButton.addEventListener("click", async () => {
   try {
