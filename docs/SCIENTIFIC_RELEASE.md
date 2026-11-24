@@ -48,6 +48,8 @@ python -I scripts/verify_scientific_review_bundle.py --root /path/to/extracted-e
 
 The standalone verifier passed from a clean Git source export. All 18 final controller fingerprints matched that export. Archive path/type checks and decoded-content privacy screening passed for 224 members, including the nested original archive. No original receipt was redacted or re-signed. Private configuration, credentials, the spending ledger, internal TODO and unrelated work are excluded from the evidence archive.
 
+The publication PR's hosted CI run was canceled at the owner's request. GitHub Actions is disabled. The regression counts above are the recorded local evaluation results, not a claim that publication CI passed.
+
 Screening is not a universal secret-detection guarantee. Hashes establish internal consistency, not third-party signatures. The offline verifier does not authenticate provider/reviewer identities or independently attest to historical CockroachDB access. No new live database check was performed for publication.
 
 ## Scope and Baselines
