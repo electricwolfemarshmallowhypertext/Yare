@@ -1,0 +1,24 @@
+id: yare-nebius
+display_name: Yare Nebius Token Factory
+description: Endpoint-bound Token Factory access for the isolated coding producer
+category: inference
+inference_capable: true
+credentials:
+  - name: api_key
+    description: Nebius Token Factory API key
+    env_vars: [NEBIUS_API_KEY]
+    required: true
+    auth_style: bearer
+    header_name: authorization
+discovery:
+  credentials: [api_key]
+endpoints:
+  - host: api.tokenfactory.nebius.com
+    port: 443
+    path: /v1/**
+    protocol: rest
+    enforcement: enforce
+    rules:
+      - allow: {method: GET, path: /v1/models}
+      - allow: {method: POST, path: /v1/chat/completions}
+binaries: [/usr/local/bin/python3.12]

@@ -1,0 +1,163 @@
+const published = require("../public-upgrade-handoff.json");
+const { hash, publicText, checkPublicValue, publicTest, verifyRecord } = require("../lib/verified-record");
+
+function evidenceFor(row) {
+  const { packet, evidence, receipt } = verifyRecord(row);
+  if (!receipt.access_evidence) throw Error("stored source evidence missing");
+  const state = {};
+  for (const key of ["what_changed", "what_is_true", "what_is_unverified",
+    "what_contradicts_prior_state", "what_needs_human_approval", "open_loops", "next_clean_action"]) {
+    const value = row.state_json[key];
+    state[key] = Array.isArray(value) ? value.map(item => typeof item === "object"
+      ? publicText(item.text) : publicText(item)) : publicText(value);
+  }
+  const access = receipt.access_evidence;
+  if (typeof access.policy_allows_read !== "boolean" || !Number.isInteger(access.exit_code)) {
+    throw Error("stored access decision missing");
+  }
+  const fullTest = publicTest(evidence.full_test);
+  const handoff = { ...state };
+  const corrections = [];
+  const failedSuite = fullTest.exit_code !== 0 &&
+    /\bFAILED\s*\([^)]*(?:failures|errors)=[1-9]\d*[^)]*\)/.test(`${fullTest.stdout}\n${fullTest.stderr}`);
+  if (failedSuite) {
+    for (const [key, status] of [["what_is_true", "verified"], ["what_is_unverified", "unverified"]]) {
+      const values = Array.isArray(state[key]) ? state[key] : [];
+      const contradicted = values.filter(claim => /^all full[- ]suite tests passed[.!]?$/i.test(claim.trim()));
+      if (!contradicted.length) continue;
+      handoff[key] = values.filter(claim => !contradicted.includes(claim));
+      const previous = Array.isArray(handoff.what_contradicts_prior_state) ? handoff.what_contradicts_prior_state : [];
+      handoff.what_contradicts_prior_state = [...new Set([...previous, ...contradicted])];
+      for (const claim of contradicted) {
+        corrections.push({ claim, recorded_status: status, corrected_status: "contradicted",
+          evidence_ref: "full_test", observed_exit_code: fullTest.exit_code,
+          reason: "The recorded full-suite output reports failing tests." });
+      }
+    }
+    if (corrections.length) handoff.next_clean_action = "Fix the failing full-suite tests, then rerun the full suite.";
+  }
+  return {
+    task: publicText(packet.task), patch: publicText(evidence.diff), source_sha256: evidence.source_sha256,
+    targeted_test: publicTest(evidence.partial_test), full_test: fullTest,
+    handoff, recorded_handoff: state, classification_corrections: corrections,
+    handoff_basis: corrections.length ? "evidence_corrected_view" : "recorded_state",
+    hash_basis: "original_stored_record",
+    assessment: evidence.handoff_assessment ? {
+      observed_exit_code: evidence.handoff_assessment.observed_exit_code,
+      unverified_claim: publicText(evidence.handoff_assessment.unverified_claim),
+      explanation: publicText(evidence.handoff_assessment.explanation)
+    } : null,
+    access: { policy_allows_read: access.policy_allows_read, exit_code: access.exit_code,
+      stderr: publicText(access.stderr),
+      effective_policy_hash: access.effective_policy_hash, source_sha256: access.source_sha256 }
+  };
+}
+
+let pool;
+
+function getPool(env) {
+  if (!pool) {
+    const { Pool } = require("pg");
+    pool = new Pool({
+      connectionString: env.YARE_DATABASE_URL,
+      max: 1,
+      connectionTimeoutMillis: 15000,
+      query_timeout: 15000,
+      idleTimeoutMillis: 30000,
+      ssl: {
+        ca: env.YARE_DATABASE_CA_PEM || undefined,
+        rejectUnauthorized: true
+      }
+    });
+    pool.on("error", () => console.error("yare_verified_handoff", { code: "POOL_ERROR" }));
+  }
+  return pool;
+}
+
+function respond(res, status, payload) {
+  if (status === 200) checkPublicValue(payload);
+  res.statusCode = status;
+  res.setHeader("content-type", "application/json; charset=utf-8");
+  res.setHeader("cache-control", status === 200
+    ? "public, max-age=0, s-maxage=60, stale-while-revalidate=300" : "no-store");
+  res.end(JSON.stringify(payload));
+}
+
+function createHandler({ env = process.env, poolFor = getPool, approved = published } = {}) {
+  return async function handler(req, res) {
+    if (req.method !== "GET") {
+      respond(res, 405, { error: "method not allowed" });
+      return;
+    }
+    if (env.YARE_PUBLIC_UPGRADE_ENABLED !== "true") {
+      respond(res, 503, { error: "upgrade handoff not published" });
+      return;
+    }
+    if (!env.YARE_DATABASE_URL) {
+      respond(res, 503, { error: "database unavailable" });
+      return;
+    }
+
+    try {
+      const db = poolFor(env);
+      const runs = {};
+      for (const phase of ["a", "b"]) {
+        const record = approved[phase];
+        const result = await db.query(`
+          SELECT cs.run_id, cs.current_state_hash, cs.created_at, rec.receipt_hash,
+                 cs.state_json, rec.receipt_json,
+                 COALESCE(cs.packet_json, CASE WHEN r.current_state_hash = cs.current_state_hash
+                   THEN r.compiled_state_json END) AS packet_json
+          FROM yare_current_states cs
+          JOIN yare_receipts rec
+            ON rec.run_id = cs.run_id
+           AND rec.current_state_hash = cs.current_state_hash
+          JOIN yare_runs r ON r.run_id = cs.run_id
+          WHERE cs.run_id = $1
+            AND cs.current_state_hash = $2
+            AND rec.receipt_hash = $3
+          LIMIT 1
+        `, [record.run_id, record.current_state_hash, record.receipt_hash]);
+        if (result.rows.length !== 1) {
+          respond(res, 404, { error: "published handoff not found" });
+          return;
+        }
+        const row = result.rows[0];
+        if (row.run_id !== record.run_id || row.current_state_hash !== record.current_state_hash ||
+            row.receipt_hash !== record.receipt_hash) throw Error("unapproved record");
+        const evidence = evidenceFor(row);
+        runs[phase] = {
+          run_id: row.run_id,
+          current_state_hash: row.current_state_hash,
+          receipt_hash: row.receipt_hash,
+          created_at: row.created_at instanceof Date
+            ? row.created_at.toISOString() : String(row.created_at || ""),
+          ...evidence,
+          next_action: evidence.handoff.next_clean_action
+        };
+      }
+      if (runs.a.access.source_sha256 !== runs.b.access.source_sha256) {
+        throw Error("access decisions name different snapshots");
+      }
+      respond(res, 200, {
+        task: runs.a.task,
+        scope: approved.scope,
+        summary_source: "Recorded evidence loaded from CockroachDB; original state, source and receipt hashes checked. Handoff classification is corrected against recorded test failures where applicable. No new agent run.",
+        a: runs.a,
+        b: runs.b
+      });
+    } catch (error) {
+      const message = typeof error?.message === "string" ? error.message : "";
+      const integrityFailure = /stored |unapproved record|access decisions/.test(message);
+      const privateData = message === "private data in publication fields";
+      const code = privateData ? "PUBLICATION_REJECTED"
+        : integrityFailure ? "EVIDENCE_INTEGRITY_FAILURE" : "DATABASE_READ_FAILURE";
+      console.error("yare_verified_handoff", { code });
+      respond(res, 503, { error: "handoff unavailable", code });
+    }
+  };
+}
+
+module.exports = createHandler();
+module.exports.createHandler = createHandler;
+module.exports.hash = hash;

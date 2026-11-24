@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+      - nebius-upgrade
+      - codex/nebius-nemotron-upgrade
 
 jobs:
   lead-demo:
@@ -23,7 +25,14 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements-cli.txt
-          python -m pip install pytest pyyaml
+
+      - name: Check clean CLI installation
+        shell: pwsh
+        run: python -m cli.yare doctor
+
+      - name: Install test runner
+        shell: pwsh
+        run: python -m pip install pytest
 
       - name: Validate CLI syntax
         shell: pwsh

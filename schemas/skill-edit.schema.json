@@ -21,6 +21,10 @@
     "timestamp"
   ],
   "properties": {
+    "old_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
     "schema_version": {
       "type": "string",
       "const": "skill-edit.v1"

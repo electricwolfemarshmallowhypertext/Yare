@@ -1,0 +1,261 @@
+{
+  "baseline_commit": "3d5a8d81297df52ad304a1062e0c0fc77a6269b0",
+  "date": "2026-11-24",
+  "execution": "scripted_fixture",
+  "storage": "offline_exports_not_cockroach",
+  "model_calls": 0,
+  "python": "3.12.10",
+  "source_fingerprints": {
+    "files": {
+      "cli/scientific.py": "ff381fea6192ca2b72a4d3accc4825ac17dfd9de5aa6aa84e306c6a839e66573",
+      "cli/storage.py": "9f7b466def8abbe6d4d080b08d5baa2e00903f18f74c7b5e1f8c752bcb32eee3",
+      "cli/yare.py": "62b797c4daefd1e2bf8b87a517aa10ad0905904f6aa405b9e33bb654848a7425",
+      "examples/scientific-handoff/.gitattributes": "611cf64d16704d8656802cf54b988d78206792853faa742d4352c6f75307464c",
+      "examples/scientific-handoff/analysis.py": "71273444a6e5f2981a1526a6c5f6e4798d758fa98136e340214c71179b51a240",
+      "examples/scientific-handoff/brief.md": "496f73f11ccf98c718378cb30c36fdb4d5e510d62367c301cc8072185ec4a4ae",
+      "examples/scientific-handoff/data/gaia.csv": "232b0343642941f8a9dd5dfe62d595681b8014dc7de01d4e511a95c0bab46f5e",
+      "examples/scientific-handoff/data/manifest.json": "6c23a8cb11e102763a704974b16333cd5905460ec73b625c48d03c9ad0da7073",
+      "examples/scientific-handoff/data/ztf.json": "dae88cb94a72315c3977e3035ec9f3284705b27fb2329848c9923782988a7abd",
+      "examples/scientific-handoff/requests/a.json": "0aa8b60f74bfbeb562665c904dbe9303ad5b93569b5479be0fe475d7836a79a1",
+      "examples/scientific-handoff/requests/b.json": "d773edbdcd37179aa187148e85ce696218f439f8e737f94e18ac7066d82e9776",
+      "examples/scientific-handoff/requests/c.json": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+      "examples/scientific-handoff/requests/d.json": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+      "producers/scientific.py": "51a9096c3d7be66e0f7c0e60969916048478200e784c3881bc649806ac56270c",
+      "schemas/lead-artifact.schema.json": "1868a7abc91fee70a673fd2ec1c1f7626cc10520e17a8e07a929d728954752a1",
+      "schemas/scientific-evidence.schema.json": "aa37503430f200c51a57efcdcf35415d8badce1ca91e592a1f80a6e579f19d2d",
+      "scripts/freeze_scientific_data.py": "ae3d2355d70852a1522e3ac588bb9297d356d1dc5548f7bebae900f692ff3884",
+      "scripts/scientific_fixture.py": "dd6a7a9f5a3dd16b33277a9ad75b19dba445ca7bfd011ff9d176a13317c9f57e",
+      "tests/yare/test_scientific.py": "fcd433ec00ec5020ed528101fc7f934c516f32c8261cc1f84a3685f8e9dc3178"
+    },
+    "combined_sha256": "b4a8ada60d1ebf4201520cae85e57ccc2c7a8a3f64960f6e21abd7f307407b72"
+  },
+  "operator_decision": {
+    "source": "user-in-chat",
+    "decision": "request_followup",
+    "note": "Request diagnostic follow-up only; keep classification unverified",
+    "authenticated_by_yare": false
+  },
+  "verified_records": 12,
+  "verified_parent_links": 9,
+  "stages": [
+    {
+      "mode": "scripted_fixture",
+      "storage": "local_export_not_cockroach",
+      "stage": "A",
+      "run_id": "public-science-offline-1-a",
+      "state_hash": "b87ca6a52e4334b84a5b6f0818f830185513f16b7c528e14f0d5342f262c3624",
+      "receipt_hash": "811226da8263116a832bcc6b2ace68daeeee59a3661bf7b372517ac541aba1f0",
+      "compile_ms": 186.8559999857098,
+      "local_reload_ms": 8.780300035141408,
+      "export_bytes": 325433,
+      "parent": null,
+      "model_calls": 0
+    },
+    {
+      "mode": "scripted_fixture",
+      "storage": "local_export_not_cockroach",
+      "stage": "B",
+      "run_id": "public-science-offline-1-b",
+      "state_hash": "998e16fbc07309a5cd6c29b200dba41f91ad273ad48ad831f0bb7600ab70c7ba",
+      "receipt_hash": "25a65216fbf9b5c5b4d188becb7a1077366f104d7d8bb3b6bbd09ba501a3195c",
+      "compile_ms": 162.8715000115335,
+      "local_reload_ms": 9.088000049814582,
+      "export_bytes": 331245,
+      "parent": {
+        "run_id": "public-science-offline-1-a",
+        "current_state_hash": "b87ca6a52e4334b84a5b6f0818f830185513f16b7c528e14f0d5342f262c3624",
+        "receipt_hash": "811226da8263116a832bcc6b2ace68daeeee59a3661bf7b372517ac541aba1f0"
+      },
+      "model_calls": 0
+    },
+    {
+      "mode": "scripted_fixture",
+      "storage": "local_export_not_cockroach",
+      "stage": "C",
+      "run_id": "public-science-offline-1-c",
+      "state_hash": "81401ba794b471f5be65574cadecdc4c9a4cb225bc2179144939f7990c685ec5",
+      "receipt_hash": "a29f75b24c3284d78675b4f8f8830450ab3ca828369eec9f49410fd7dbf9003c",
+      "compile_ms": 153.56199990492314,
+      "local_reload_ms": 8.903900044970214,
+      "export_bytes": 331245,
+      "parent": {
+        "run_id": "public-science-offline-1-b",
+        "current_state_hash": "998e16fbc07309a5cd6c29b200dba41f91ad273ad48ad831f0bb7600ab70c7ba",
+        "receipt_hash": "25a65216fbf9b5c5b4d188becb7a1077366f104d7d8bb3b6bbd09ba501a3195c"
+      },
+      "model_calls": 0
+    },
+    {
+      "mode": "scripted_fixture",
+      "storage": "local_export_not_cockroach",
+      "stage": "D",
+      "run_id": "public-science-offline-1-d",
+      "state_hash": "d60e5064b8ed8a0a77c73c024edc2801dbc10574bce3a682f2ee81fc9d503200",
+      "receipt_hash": "bfc15933107de5b4bb77b2adc8ba42f8e4fe6511d71eee2ab5db713c08f14ed9",
+      "compile_ms": 153.76540005672723,
+      "local_reload_ms": 8.67500004824251,
+      "export_bytes": 334603,
+      "parent": {
+        "run_id": "public-science-offline-1-c",
+        "current_state_hash": "81401ba794b471f5be65574cadecdc4c9a4cb225bc2179144939f7990c685ec5",
+        "receipt_hash": "a29f75b24c3284d78675b4f8f8830450ab3ca828369eec9f49410fd7dbf9003c"
+      },
+      "model_calls": 0
+    },
+    {
+      "mode": "scripted_fixture",
+      "storage": "local_export_not_cockroach",
+      "stage": "A",
+      "run_id": "public-science-offline-2-a",
+      "state_hash": "28fd7dc33693dcee3a3038f208f8ba86a68db8101cd2eb428056e3799f06f163",
+      "receipt_hash": "c0c99c8e4a95dce3deb94b8d2b843b84f68b91fa07d4d681a0d71ae917ee9803",
+      "compile_ms": 154.08619993831962,
+      "local_reload_ms": 8.782900054939091,
+      "export_bytes": 325433,
+      "parent": null,
+      "model_calls": 0
+    },
+    {
+      "mode": "scripted_fixture",
+      "storage": "local_export_not_cockroach",
+      "stage": "B",
+      "run_id": "public-science-offline-2-b",
+      "state_hash": "ba4366a0a145e1b46269f26f96aaa86f6728d5ebedda0e85dd0444a0e5936016",
+      "receipt_hash": "11ce60a9b31795133e9dcd84f3da3c3987ed8da8b01ef6af41b259a5b1303871",
+      "compile_ms": 153.9706999901682,
+      "local_reload_ms": 9.247699985280633,
+      "export_bytes": 331245,
+      "parent": {
+        "run_id": "public-science-offline-2-a",
+        "current_state_hash": "28fd7dc33693dcee3a3038f208f8ba86a68db8101cd2eb428056e3799f06f163",
+        "receipt_hash": "c0c99c8e4a95dce3deb94b8d2b843b84f68b91fa07d4d681a0d71ae917ee9803"
+      },
+      "model_calls": 0
+    },
+    {
+      "mode": "scripted_fixture",
+      "storage": "local_export_not_cockroach",
+      "stage": "C",
+      "run_id": "public-science-offline-2-c",
+      "state_hash": "08f736de4848184fc2de4a8963b26e7ffacc3423aa55bb5f7bbaaa49970bd525",
+      "receipt_hash": "5bcc8e41f17dd7b52ee83901726ccab9e60405336766e0fdb992e5f49ffb854c",
+      "compile_ms": 150.11689998209476,
+      "local_reload_ms": 9.44080005865544,
+      "export_bytes": 331245,
+      "parent": {
+        "run_id": "public-science-offline-2-b",
+        "current_state_hash": "ba4366a0a145e1b46269f26f96aaa86f6728d5ebedda0e85dd0444a0e5936016",
+        "receipt_hash": "11ce60a9b31795133e9dcd84f3da3c3987ed8da8b01ef6af41b259a5b1303871"
+      },
+      "model_calls": 0
+    },
+    {
+      "mode": "scripted_fixture",
+      "storage": "local_export_not_cockroach",
+      "stage": "D",
+      "run_id": "public-science-offline-2-d",
+      "state_hash": "1f968e6f1ec3b7811de2d5e66b35c58951059701ba03adc428dbab95fd917f20",
+      "receipt_hash": "32176520411b25997ace60d0b354294948b0ca26ac353712f9dd8a4c0aa8716e",
+      "compile_ms": 272.25090004503727,
+      "local_reload_ms": 9.333799942396581,
+      "export_bytes": 334603,
+      "parent": {
+        "run_id": "public-science-offline-2-c",
+        "current_state_hash": "08f736de4848184fc2de4a8963b26e7ffacc3423aa55bb5f7bbaaa49970bd525",
+        "receipt_hash": "5bcc8e41f17dd7b52ee83901726ccab9e60405336766e0fdb992e5f49ffb854c"
+      },
+      "model_calls": 0
+    },
+    {
+      "mode": "scripted_fixture",
+      "storage": "local_export_not_cockroach",
+      "stage": "A",
+      "run_id": "public-science-offline-3-a",
+      "state_hash": "5c2cbed7f3ead12f3012794dd8f263c8a34d5a5476c72a7636670678f280aec4",
+      "receipt_hash": "135d88f454817308a263e9b63b681712038a05ed7a9681a35eae8f2a1fc6075a",
+      "compile_ms": 155.0787000451237,
+      "local_reload_ms": 9.20649990439415,
+      "export_bytes": 325433,
+      "parent": null,
+      "model_calls": 0
+    },
+    {
+      "mode": "scripted_fixture",
+      "storage": "local_export_not_cockroach",
+      "stage": "B",
+      "run_id": "public-science-offline-3-b",
+      "state_hash": "6ec8b1608bd8029800525033823c47b61ec9941791d84b35cc795c23e29288ca",
+      "receipt_hash": "e7a04950f1a517210cfccaa35ed92584b6995df586deade9c9abe94435b16222",
+      "compile_ms": 153.7870999891311,
+      "local_reload_ms": 8.774599991738796,
+      "export_bytes": 331245,
+      "parent": {
+        "run_id": "public-science-offline-3-a",
+        "current_state_hash": "5c2cbed7f3ead12f3012794dd8f263c8a34d5a5476c72a7636670678f280aec4",
+        "receipt_hash": "135d88f454817308a263e9b63b681712038a05ed7a9681a35eae8f2a1fc6075a"
+      },
+      "model_calls": 0
+    },
+    {
+      "mode": "scripted_fixture",
+      "storage": "local_export_not_cockroach",
+      "stage": "C",
+      "run_id": "public-science-offline-3-c",
+      "state_hash": "75566d88656aa802ea4a79ca8b16978346abaa94888acbb3bc41224edb36a9f5",
+      "receipt_hash": "305d77e8ac29d3671009ca162f6127d80540319b966ccc138e73974682126f02",
+      "compile_ms": 152.40089991129935,
+      "local_reload_ms": 8.965100045315921,
+      "export_bytes": 331245,
+      "parent": {
+        "run_id": "public-science-offline-3-b",
+        "current_state_hash": "6ec8b1608bd8029800525033823c47b61ec9941791d84b35cc795c23e29288ca",
+        "receipt_hash": "e7a04950f1a517210cfccaa35ed92584b6995df586deade9c9abe94435b16222"
+      },
+      "model_calls": 0
+    },
+    {
+      "mode": "scripted_fixture",
+      "storage": "local_export_not_cockroach",
+      "stage": "D",
+      "run_id": "public-science-offline-3-d",
+      "state_hash": "c378493d1b196d542918690238328c00a12e32125391346501046331f66c939c",
+      "receipt_hash": "9c4cd27fb4f869dddfff7d735e63cfd1741fe3c031b60e9aad0f45b712cb5c86",
+      "compile_ms": 151.97170001920313,
+      "local_reload_ms": 9.373000008054078,
+      "export_bytes": 334603,
+      "parent": {
+        "run_id": "public-science-offline-3-c",
+        "current_state_hash": "75566d88656aa802ea4a79ca8b16978346abaa94888acbb3bc41224edb36a9f5",
+        "receipt_hash": "305d77e8ac29d3671009ca162f6127d80540319b966ccc138e73974682126f02"
+      },
+      "model_calls": 0
+    }
+  ],
+  "measurements": {
+    "caution": "Reported measurement errors only; systematic and correlated errors are not modeled. Descriptive statistics do not establish an astronomical class or discovery.",
+    "constant_model_chi_squared": 262.3120756345987,
+    "degrees_of_freedom": 99,
+    "endpoint_delta_error_mag": 0.04178694528491688,
+    "endpoint_delta_mag": 0.022276000000001517,
+    "endpoint_delta_over_error": 0.5330851501136673,
+    "n": 100,
+    "weighted_mean_error_mag": 0.0028572491721974166,
+    "weighted_mean_mag": 17.63221564042117
+  },
+  "offline_regression": {
+    "python_passed": 189,
+    "python_skipped": 2,
+    "node_passed": 42,
+    "scientific_cases_passed": 32,
+    "fixture_section_questions_matched": 6,
+    "fixture_section_questions_total": 6
+  },
+  "not_verified": [
+    "live scientific-agent reasoning",
+    "live scientific Cockroach persistence and retrieval",
+    "live database latency or physical storage growth",
+    "ANN or scientific semantic retrieval quality",
+    "scientific interpretation correctness",
+    "observatory-scale readiness"
+  ]
+}

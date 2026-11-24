@@ -1,0 +1,8 @@
+data/ztf.json -text
+data/gaia.csv -text
+data/manifest.json -text
+references/gaia-dr3-units/* -text
+*.json whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+references/gaia-dr3-units/gaia-source.html -whitespace
+analysis.py text eol=lf
+brief.md text eol=lf

@@ -1,0 +1,11 @@
+{
+  "source_url": "https://gea.esac.esa.int/archive/documentation/GDR3/Gaia_archive/chap_datamodel/sec_dm_main_source_catalogue/ssec_dm_gaia_source.html",
+  "acquired_at": "2026-11-24T18:15:50.773890+00:00",
+  "document_sha256": "800bf953fa4d5b63c4f7dabe024753eb4fc987833b6265e57ec5030d9d558c0c",
+  "excerpt": "ra_error : Standard error of right ascension (float, Angle[mas])\ndec_error : Standard error of declination (float, Angle[mas])",
+  "excerpt_sha256": "7ca46036cbea513af849fd2b8644a7e729d10812a104c5057a6a6f83e82c0872",
+  "units": {
+    "ra_error": "mas",
+    "dec_error": "mas"
+  }
+}

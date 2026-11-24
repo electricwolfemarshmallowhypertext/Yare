@@ -2,7 +2,7 @@
 
 Status: PASS
 
-Bucket: `yare-artifacts-187691954867-us-east-2-an`
+Bucket: `[redacted]` (Amazon S3, `us-east-2`)
 
 Deterministic hash: `9a28c62809b16bcaffc49bfece25eca579b3020b24d1644438b0b6acadfa9859`
 
@@ -14,4 +14,4 @@ Uploaded objects:
 - `yare/current-states/9a28c62809b16bcaffc49bfece25eca579b3020b24d1644438b0b6acadfa9859/current-state.md`
 - `yare/current-states/9a28c62809b16bcaffc49bfece25eca579b3020b24d1644438b0b6acadfa9859/receipt.jsonl`
 
-No secrets were included.
+AWS account/bucket identifiers are redacted from this public report. Object keys and hashes are retained. This is the historical smoke result, not a fresh access check.

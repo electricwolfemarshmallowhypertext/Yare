@@ -14,7 +14,7 @@ After `yare lead compile` succeeds and `YARE_DATABASE_URL` is set, Yare persists
 - open loops
 - next clean action
 
-Yare uses a deterministic local text-to-vector hashing function. It does not call OpenAI, Bedrock, or any external embedding service.
+Yare uses 32-dimensional deterministic token hashing. Search combines vector distance with word overlap, a small synonym map, and section ranking. This is word-assisted vector search, not a learned semantic embedding model or a measured general-language retrieval score. It does not call OpenAI, Bedrock, or any external embedding service.
 
 ## CockroachDB Schema
 
@@ -61,7 +61,7 @@ python -m cli.yare lead compile --task "compile ai work lead state" --artifact e
 python -m cli.yare memory search --query "what still needs human review?" --limit 3
 ```
 
-The command embeds the query locally, searches CockroachDB with the vector index, and prints:
+The command embeds the query locally and collects vector-index candidates plus word matches from CockroachDB. It ranks matching sections and words before vector distance and removes repeated section/text results across snapshots. This combines word matching with the local hash vectors; it is not a learned language embedding model. It prints:
 
 - section name
 - distance

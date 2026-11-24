@@ -4,6 +4,8 @@ Status: PARTIAL PASS
 
 Date: 2026-08-01
 
+This is the historical command-runner result. Its `bench: complete` output meant commands finished, not that the expected handoff or storage bytes were asserted. The current assertion-backed rerun is documented in [HANDOFF_ASSERTIONS_RESULT.md](HANDOFF_ASSERTIONS_RESULT.md).
+
 ## Scope
 
 This result documents the public proof-bench rerun from the local Codex PowerShell environment.

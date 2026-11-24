@@ -1,0 +1,13 @@
+{
+  "hypotheses": [{
+    "id": "hypothesis-full-series", "status": "disputed",
+    "statement": "Full-series variability or unmodeled systematics may explain the scatter; an endpoint-only comparison is insufficient.",
+    "evidence_refs": ["ztf", "gaia"]
+  }],
+  "disagreements": [{
+    "id": "disagreement-endpoints", "hypothesis_ids": ["hypothesis-endpoints", "hypothesis-full-series"],
+    "evidence_refs": ["ztf", "ztf-observation-0", "ztf-observation-99"], "status": "open",
+    "reason": "The endpoint change does not summarize the full series; review the pinned constant-model chi-squared and its noise assumptions before accepting a constant-brightness interpretation."
+  }],
+  "questions": [{"id": "question-systematics", "text": "Are systematic or correlated photometric errors sufficient to explain the full-series scatter?", "status": "open"}]
+}
