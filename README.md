@@ -2,15 +2,15 @@
 
 **Shared work memory for AI agents.**
 
-[Technical architecture](docs/ARCHITECTURE.md)
+[Technical architecture](docs/ARCHITECTURE.md) | [Scientific continuity results](docs/SCIENTIFIC_HUMAN_REVIEW_RESULT.md)
 
 ## What
 
-Yare lets one AI coding agent hand unfinished work to another without losing the facts.
+Yare lets one AI agent hand unfinished work to another without losing the evidence.
 
 It saves code changes, actual test results, and remaining work in CockroachDB. The next agent can see what passed, what failed, and what still needs fixing instead of trusting the previous agent's claims.
 
-- [Try the read-only A/B demo](https://yare-vert.vercel.app/demo)
+- [View recorded coding handoffs](https://yare-vert.vercel.app/demo)
 - [Explore use cases](https://yare-vert.vercel.app/use-cases/)
 - [Visit the project site](https://yare-vert.vercel.app/)
 
@@ -22,7 +22,9 @@ Yare keeps the work and its evidence together so the next agent can pick up unfi
 
 In one recorded coding task, the first agent passed four focused tests but left two failures in the full suite. A fresh agent loaded the saved handoff, finished the fix, and passed all six tests. This demonstrates that handoff on one task, not general autonomous coding performance.
 
-The public demo shows the saved code changes and results from that task. It does not start a new agent run. [Read the recorded result](docs/NEMOTRON_BOUNDARY_RESULT.md).
+The public demo shows recorded coding handoffs, including a four-agent chain and the earlier A/B task. It does not start a new agent run or display the scientific pilot. [Read the recorded A/B result](docs/NEMOTRON_BOUNDARY_RESULT.md).
+
+In three scientific handoff sequences using public ZTF and Gaia observations, Yare preserved nine model-generated records and three deterministic human-review records. All twelve records and nine parent links were verified. Work-state continuity passed; the participating model's scientific reasoning failed. Its errors and unresolved questions were retained.
 
 ## How
 
@@ -41,13 +43,13 @@ Yare stores the handoff; it is not the coding model. The separate coding produce
 Start locally:
 
 ```bash
-git clone --branch nebius-upgrade https://github.com/electricwolfemarshmallowhypertext/Yare.git
+git clone --branch scientific-work-continuity https://github.com/electricwolfemarshmallowhypertext/Yare.git
 cd Yare
 python -m pip install -r requirements-cli.txt
 python -m cli.yare doctor
 ```
 
-The `nebius-upgrade` branch contains the coding producer and A/B handoff described here. `main` preserves the earlier release.
+The `scientific-work-continuity` branch contains the coding producer and scientific continuity work described here. `nebius-upgrade` preserves the coding upgrade; `main` preserves the earlier release.
 
 Compile the included artifacts into a local handoff:
 

@@ -5,13 +5,13 @@ Yare compiles agent work records into durable handoffs. CockroachDB is the prima
 ## Data Flow
 
 ```text
-Coding producer or imported tool output
+Coding or scientific producer, imported tool output, or human review
 -> Lead Artifact: changes, claims, test evidence, unfinished work
 -> CLI validation and compile
 -> current state, source packet, and receipt
 -> CockroachDB storage
 -> verified handoff load
--> next coding agent
+-> next agent or human review
 ```
 
 Local JSON exports are an optional fallback. S3 can archive proof artifacts when configured; it is not required for the CockroachDB handoff.
@@ -21,6 +21,8 @@ Local JSON exports are an optional fallback. S3 can archive proof artifacts when
 `cli/yare.py` validates Lead Artifacts and compiles changed files, supported facts, unverified claims, contradictions, approval items, open loops, and next action.
 
 A verified claim requires linked test evidence or a recorded human review for that claim. The coding controller records command output and exit codes. Imported evidence must come from a trusted runner or reviewer: the compiler checks the supplied record, not the identity of its author, and does not rerun arbitrary artifact commands. Disputed claims are excluded from confirmed facts. An omitted claim is removed, not automatically resolved.
+
+`evidence.scientific` is optional. `cli/scientific.py` validates frozen observations, uncertainties, dataset and analysis provenance, hypotheses, disagreements, and unresolved questions. Scientific interpretations remain unverified or disputed; reproducible calculations do not establish scientific conclusions. Deterministic D records keep the human decision and review annotations separate from the original model statements, including duplicated hypotheses and incorrect unit statements. See the [scientific continuity results](SCIENTIFIC_HUMAN_REVIEW_RESULT.md).
 
 See [Handoff Integrity](HANDOFF_INTEGRITY.md) for the evidence shape and loader checks.
 
@@ -38,7 +40,9 @@ The `work-state.v2` state hash covers the task, current state, and normalized ar
 
 `producers/handoff.py` loads the selected state, packet, source code, and matching receipt from CockroachDB. It checks their hashes and associations before B uses the code. Missing or mismatched records stop the handoff. New B artifacts can identify the exact parent handoff; that field is not retroactively added to historical runs.
 
-Hashes detect record changes; they do not establish author trust or coding correctness.
+`producers/scientific.py` uses the verified loader in `cli/storage.py` and `cli.scientific.verify_continuity` to bind each handoff to the exact parent run, state hash, and receipt. It reuses the existing database tables. In the scientific pilot, A, B, and C were separate local-model sessions; D is a deterministic `human_decision` record, not a fourth model generation. The human review preserves prior observations, hypotheses, disagreements, and questions rather than replacing their contents. Work-state continuity passed while scientific reasoning acceptance failed.
+
+Hashes detect record changes; they do not establish author trust, coding correctness, or scientific correctness.
 
 ## Memory Search
 
@@ -56,11 +60,11 @@ See [Provider Routing](NEBIUS_PROVIDER_ROUTING.md) for setup and integration det
 
 ## Public Read-Only Demo
 
-`site/demo.html` and `site/demo.js` fetch `/api/verified-handoff`. The Node endpoint uses `pg` and server-side `YARE_DATABASE_URL` to read two approved CockroachDB records. It verifies state, packet, source, and receipt integrity before returning an allowlisted public projection. Credentials remain server-side.
+`site/demo.html` and `site/demo.js` show the recorded four-agent coding chain by default through `/api/verified-chain`, with the earlier A/B handoff available through `/api/verified-handoff`. The Node endpoints use `pg` and server-side `YARE_DATABASE_URL` to read approved CockroachDB records. They verify state, packet, source, and receipt integrity before returning allowlisted public projections. Credentials remain server-side.
 
-The page presents a plain-English summary with expandable technical evidence and a JSON download. Loading it does not run a model, edit code, or write database records. Paid public execution remains disabled by default.
+The page presents a plain-English summary with expandable technical evidence and a JSON download. Loading it does not run a model, edit code, or write database records. Paid public execution remains disabled by default. The scientific pilot is documented in code and result reports; it is not displayed by this coding demo.
 
-The recorded artifacts were recompiled after the coding run to bind access evidence into receipts; those database timestamps are not coding-run durations. For A's historical claim that all full-suite tests passed, the API exposes an evidence-based correction to contradicted because the saved full-suite output reports failures. The original handoff is retained separately. Exported hashes refer to the original stored records, not the corrected display view. The projected JSON alone does not contain every input needed to recompute those hashes independently.
+The A/B artifacts were recompiled after the coding run to bind access evidence into receipts; those database timestamps are not coding-run durations. For A's historical claim that all full-suite tests passed, the A/B API exposes an evidence-based correction to contradicted because the saved full-suite output reports failures. The original handoff is retained separately. Exported hashes refer to the original stored records, not the corrected display view. The projected JSON alone does not contain every input needed to recompute those hashes independently.
 
 ## Optional Archive and Scope
 
