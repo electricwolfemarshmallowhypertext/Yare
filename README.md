@@ -2,7 +2,7 @@
 
 **Shared work memory for AI agents.**
 
-[Technical architecture](docs/ARCHITECTURE.md) | [Scientific continuity results](docs/SCIENTIFIC_HUMAN_REVIEW_RESULT.md)
+[Technical architecture](docs/ARCHITECTURE.md) | [Scientific continuity results](docs/SCIENTIFIC_HUMAN_REVIEW_RESULT.md) | [Research release and evidence](docs/SCIENTIFIC_RELEASE.md)
 
 ## What
 
@@ -49,7 +49,7 @@ python -m pip install -r requirements-cli.txt
 python -m cli.yare doctor
 ```
 
-The `scientific-work-continuity` branch contains the coding producer and scientific continuity work described here. `nebius-upgrade` preserves the coding upgrade; `main` preserves the earlier release.
+The `scientific-work-continuity` branch contains the coding producer and scientific continuity work described here. The research release is merged into `main`. `nebius-upgrade` preserves the coding upgrade; the `legacy-main-2026-11-24` tag preserves the earlier release.
 
 Compile the included artifacts into a local handoff:
 
