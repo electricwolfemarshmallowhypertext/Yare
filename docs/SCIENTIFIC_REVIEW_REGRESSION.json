@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-24",
+  "python": {
+    "command": "python -m pytest -q tests/",
+    "passed": 214,
+    "failed": 0,
+    "skipped": 2,
+    "skip_reasons": ["explicit live test URL required", "Creating symlinks is unavailable on this system"],
+    "live_test_environment_disabled": true
+  },
+  "node": {
+    "command": "node --test tests/site/*.cjs site/tests/*.test.js",
+    "passed": 42,
+    "failed": 0,
+    "skipped": 0
+  },
+  "focused_before_live_D": {"passed": 52, "failed": 0},
+  "legacy_api": {
+    "collection": "BLOCKED",
+    "reason": "ModuleNotFoundError: No module named 'firebase_admin'",
+    "fixtures_executed": false,
+    "services_started": false
+  },
+  "new_model_generations": 0,
+  "raw_host_specific_test_reports": "preserved locally; excluded from sanitized bundle"
+}

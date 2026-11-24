@@ -1255,6 +1255,9 @@ def _lead_normalize_artifact(raw: dict[str, Any], source_ref: str, index: int) -
         "git_state": _lead_extract_git_state(raw),
     }
     if isinstance(raw.get("evidence"), dict):
+        if "scientific" in raw["evidence"]:
+            from cli.scientific import verify_scientific_evidence
+            verify_scientific_evidence(raw["evidence"]["scientific"])
         normalized["evidence"] = raw["evidence"]
     return normalized
 

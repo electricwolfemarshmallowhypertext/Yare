@@ -1,0 +1,11 @@
+{
+  "hypotheses": [{
+    "id": "hypothesis-endpoints", "status": "unverified",
+    "statement": "The small first-to-last magnitude difference might be consistent with constant brightness; this is an endpoint-only hypothesis, not a classification.",
+    "evidence_refs": ["ztf-observation-0", "ztf-observation-99"]
+  }],
+  "questions": [
+    {"id": "question-timescale", "text": "Which authoritative documentation establishes the photometric time scale?", "status": "open"},
+    {"id": "question-counterpart", "text": "Which Gaia candidate, if any, is associated after epoch and proper-motion checks?", "status": "open"}
+  ]
+}

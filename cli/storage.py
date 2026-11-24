@@ -180,6 +180,18 @@ def verify_handoff_record(row: Any) -> dict[str, Any]:
         evidence = artifact.get("evidence") or {}
         if not isinstance(evidence, dict):
             raise StorageError("handoff_evidence_invalid")
+        if "scientific" in evidence:
+            from cli.scientific import ScientificEvidenceError, verify_scientific_evidence
+            try:
+                verify_scientific_evidence(evidence["scientific"])
+                if evidence["scientific"]["execution"] == "human_decision":
+                    from cli.scientific import scientific_review_findings
+                    review = evidence.get("scientific_review")
+                    if (not isinstance(review, dict) or review != scientific_review_findings(
+                            evidence["scientific"], review.get("unit_reference", {})) or "local_model" in evidence):
+                        raise ScientificEvidenceError("science_review_findings_mismatch")
+            except ScientificEvidenceError as exc:
+                raise StorageError(str(exc)) from exc
         if "source_code" in evidence or "source_sha256" in evidence:
             source = evidence.get("source_code")
             if not isinstance(source, str) or hashlib.sha256(source.encode("utf-8")).hexdigest() != evidence.get("source_sha256"):

@@ -1,0 +1,38 @@
+{
+  "version": "public-astronomy-data.v1",
+  "datasets": [
+    {
+      "id": "ztf",
+      "path": "ztf.json",
+      "source_url": "https://db.ztf.snad.space/api/v3/data/dr24/oid/full/json",
+      "query": {
+        "oid": "686103400034440"
+      },
+      "release": "ZTF DR24 via SNAD",
+      "acquired_at": "2026-11-24T14:42:51.182915+00:00",
+      "media_type": "application/json",
+      "sha256": "dae88cb94a72315c3977e3035ec9f3284705b27fb2329848c9923782988a7abd",
+      "rows": 724,
+      "row_selector": [
+        "686103400034440",
+        "lc"
+      ]
+    },
+    {
+      "id": "gaia",
+      "path": "gaia.csv",
+      "source_url": "https://gea.esac.esa.int/tap-server/tap/sync",
+      "query": {
+        "REQUEST": "doQuery",
+        "LANG": "ADQL",
+        "FORMAT": "csv",
+        "QUERY": "SELECT TOP 5 source_id,ra,dec,ref_epoch,ra_error,dec_error,parallax,parallax_error,phot_g_mean_mag FROM gaiadr3.gaia_source WHERE 1=CONTAINS(POINT('ICRS',ra,dec),CIRCLE('ICRS',298.0025,29.87147,0.0014)) ORDER BY source_id"
+      },
+      "release": "Gaia DR3",
+      "acquired_at": "2026-11-24T14:42:53.824046+00:00",
+      "media_type": "text/csv",
+      "sha256": "232b0343642941f8a9dd5dfe62d595681b8014dc7de01d4e511a95c0bab46f5e",
+      "rows": 3
+    }
+  ]
+}

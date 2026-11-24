@@ -184,6 +184,10 @@
       "type": "object",
       "description": "Named test or human-review records; evidence_ref resolves a record. Additional producer metadata is allowed.",
       "properties": {
+        "scientific": {
+          "type": "object",
+          "description": "Optional scientific-evidence.v1 contract. The compiler and verified loader validate schemas/scientific-evidence.schema.json and embedded provenance."
+        },
         "test_run": {"$ref": "#/$defs/testEvidence"},
         "test_claim": {"$ref": "#/$defs/testEvidence"}
       },

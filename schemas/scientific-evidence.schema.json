@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Scientific work evidence, not scientific certification",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "investigation_id", "stage", "execution", "brief_sha256", "datasets", "analysis", "observations", "hypotheses", "disagreements", "questions", "parent", "human_review"],
+  "properties": {
+    "version": {"const": "scientific-evidence.v1"},
+    "investigation_id": {"type": "string", "minLength": 1},
+    "stage": {"enum": ["A", "B", "C", "D"]},
+    "execution": {"enum": ["scripted_fixture", "live_model", "human_decision"]},
+    "brief_sha256": {"$ref": "#/$defs/hash"},
+    "datasets": {"type": "array", "minItems": 1, "maxItems": 8, "items": {"$ref": "#/$defs/dataset"}},
+    "analysis": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source_code", "sha256", "parameters", "results", "results_sha256", "environment"],
+      "properties": {
+        "source_code": {"type": "string", "minLength": 1, "maxLength": 64000},
+        "sha256": {"$ref": "#/$defs/hash"},
+        "parameters": {"type": "object"}, "results": {"type": "object"},
+        "results_sha256": {"$ref": "#/$defs/hash"},
+        "environment": {"type": "object", "required": ["python"], "properties": {"python": {"type": "string", "minLength": 1}}}
+      }
+    },
+    "observations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/observation"}},
+    "hypotheses": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/hypothesis"}},
+    "disagreements": {"type": "array", "items": {"$ref": "#/$defs/disagreement"}},
+    "questions": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/question"}},
+    "parent": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/parent"}]},
+    "human_review": {"anyOf": [{"type": "null"}, {"$ref": "#/$defs/review"}]}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "references": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "dataset": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "source_url", "query", "release", "acquired_at", "media_type", "content_utf8", "sha256", "selected_rows"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1}, "source_url": {"type": "string", "pattern": "^https://"},
+        "query": {"type": "object", "minProperties": 1}, "release": {"type": "string", "minLength": 1},
+        "acquired_at": {"type": "string", "format": "date-time"}, "media_type": {"enum": ["text/csv", "application/json"]},
+        "row_selector": {"type": "array", "minItems": 1, "maxItems": 4, "items": {"type": "string", "minLength": 1}},
+        "content_utf8": {"type": "string", "minLength": 1, "maxLength": 262144}, "sha256": {"$ref": "#/$defs/hash"},
+        "selected_rows": {"type": "array", "minItems": 1, "maxItems": 200, "items": {
+          "type": "object", "additionalProperties": false, "required": ["index", "sha256"],
+          "properties": {"index": {"type": "integer", "minimum": 0}, "sha256": {"$ref": "#/$defs/hash"}}
+        }}
+      },
+      "if": {"properties": {"media_type": {"const": "application/json"}}},
+      "then": {"required": ["row_selector"]}
+    },
+    "observation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "dataset_id", "row_index", "value_column", "uncertainty_column", "value", "uncertainty", "unit", "time_column", "time_value", "time_format", "time_scale", "band"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1}, "dataset_id": {"type": "string", "minLength": 1},
+        "row_index": {"type": "integer", "minimum": 0}, "value_column": {"type": "string", "minLength": 1},
+        "uncertainty_column": {"type": "string", "minLength": 1}, "value": {"type": "number"},
+        "uncertainty": {"type": "number", "exclusiveMinimum": 0}, "unit": {"type": "string", "minLength": 1},
+        "time_column": {"type": "string", "minLength": 1}, "time_value": {"type": "number"},
+        "time_format": {"enum": ["MJD", "JD", "decimal_year"]}, "time_scale": {"enum": ["UTC", "TAI", "TT", "TDB", "TCB", "unverified"]},
+        "band": {"type": "string", "minLength": 1}
+      }
+    },
+    "hypothesis": {
+      "type": "object", "additionalProperties": false, "required": ["id", "statement", "status", "evidence_refs"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "statement": {"type": "string", "minLength": 1},
+        "status": {"enum": ["unverified", "disputed"]}, "evidence_refs": {"$ref": "#/$defs/references"}}
+    },
+    "disagreement": {
+      "type": "object", "additionalProperties": false, "required": ["id", "hypothesis_ids", "evidence_refs", "reason", "status"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "hypothesis_ids": {"$ref": "#/$defs/references"},
+        "evidence_refs": {"$ref": "#/$defs/references"}, "reason": {"type": "string", "minLength": 1}, "status": {"const": "open"}}
+    },
+    "question": {
+      "type": "object", "additionalProperties": false, "required": ["id", "text", "status"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "text": {"type": "string", "minLength": 1}, "status": {"const": "open"}}
+    },
+    "parent": {
+      "type": "object", "additionalProperties": false, "required": ["run_id", "current_state_hash", "receipt_hash"],
+      "properties": {"run_id": {"type": "string", "minLength": 1}, "current_state_hash": {"$ref": "#/$defs/hash"}, "receipt_hash": {"$ref": "#/$defs/hash"}}
+    },
+    "review": {
+      "type": "object", "additionalProperties": false,
+      "required": ["source", "reviewer", "recorded_at", "decision", "note", "parent_receipt_hash", "record_sha256"],
+      "properties": {"source": {"const": "operator_supplied"}, "reviewer": {"type": "string", "minLength": 1},
+        "recorded_at": {"type": "string", "format": "date-time"}, "decision": {"enum": ["defer", "request_followup"]},
+        "note": {"type": "string", "minLength": 1}, "parent_receipt_hash": {"$ref": "#/$defs/hash"}, "record_sha256": {"$ref": "#/$defs/hash"}}
+    }
+  }
+}
