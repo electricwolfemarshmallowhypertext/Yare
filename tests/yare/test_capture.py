@@ -19,7 +19,7 @@ def test_capture_includes_changes_committed_by_the_command(tmp_path, monkeypatch
         if args[:2] == ("diff", "--no-ext-diff"):
             return "+actual change"
         if args[:2] == ("diff", "--name-only"):
-            return "task.py\n"
+            return "task.py\0"
         return ""
 
     monkeypatch.setattr(capture, "git_output", git_output)
@@ -34,7 +34,7 @@ def test_capture_includes_changes_committed_by_the_command(tmp_path, monkeypatch
     assert artifact["evidence"]["diff"] == "+actual change"
     assert artifact["files_touched"] == ["task.py"]
     assert ("diff", "--no-ext-diff", "before") in calls
-    assert ("diff", "--name-only", "before") in calls
+    assert ("diff", "--name-only", "-z", "before") in calls
 
 
 @pytest.mark.parametrize("fixed,expected_exit", [(True, 0), (False, 1)])
@@ -72,7 +72,23 @@ def test_capture_records_real_command_tests_and_compile_evidence(tmp_path, monke
     normalized = yare._lead_normalize_artifact(artifact, "captured.json", 1)
     monkeypatch.setattr(yare, "validate_workspace", lambda root: {"ok": True, "errors": [], "warnings": []})
     packet = yare._lead_compile_packet(tmp_path, [normalized], "Fix addition")
-    claims = packet["current_state"]["what_is_true"] if fixed else packet["current_state"]["what_is_unverified"]
+    claims = packet["current_state"]["what_is_true"] if fixed else packet["current_state"]["what_contradicts_prior_state"]
     assert any("Test command" in claim for claim in claims)
     if not fixed:
         assert packet["current_state"]["what_is_true"] == []
+
+
+def test_snapshot_changes_with_source_but_not_capture_metadata(tmp_path):
+    if not shutil.which("git"):
+        pytest.skip("Git is required for snapshot verification")
+    subprocess.run(["git", "init", "--template="], cwd=tmp_path, check=True, capture_output=True)
+    source = tmp_path / "task.py"
+    source.write_text("value = 1\n")
+    original = capture.workspace_snapshot(tmp_path)
+    assert original is not None
+    metadata = tmp_path / ".yare/captures"
+    metadata.mkdir(parents=True)
+    (metadata / "record.json").write_text("{}")
+    assert capture.workspace_snapshot(tmp_path) == original
+    source.write_text("value = 2\n")
+    assert capture.workspace_snapshot(tmp_path) != original

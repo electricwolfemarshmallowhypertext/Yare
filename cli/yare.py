@@ -1026,6 +1026,7 @@ def _lead_contract_payload(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
     optional_map = {
+        "evidence": raw.get("evidence"),
         "context_bundle_hash": raw.get("context_bundle_hash"),
         "receipt_hash": raw.get("receipt_hash"),
         "source_artifacts": raw.get("source_artifacts"),
@@ -1110,6 +1111,18 @@ def _lead_extract_claims(raw: dict[str, Any]) -> list[dict[str, Any]]:
                 claims.append(claim)
     claims.sort(key=lambda x: (x["text"].lower(), x["verification_status"]))
     return claims
+
+
+def _lead_test_scope(claim: dict[str, Any]) -> tuple[str, ...] | None:
+    evidence = claim.get("evidence")
+    if not isinstance(evidence, dict) or evidence.get("kind") != "test" or evidence.get("claim") != claim.get("text"):
+        return None
+    command = evidence.get("command")
+    if (not isinstance(command, list) or not command or
+            not all(isinstance(part, str) and part for part in command) or
+            type(evidence.get("exit_code")) is not int or type(evidence.get("expected_exit_code")) is not int):
+        return None
+    return tuple(command)
 
 
 def _lead_claim_supported(claim: dict[str, Any]) -> bool:
@@ -1255,6 +1268,8 @@ def _lead_normalize_artifact(raw: dict[str, Any], source_ref: str, index: int) -
         "git_state": _lead_extract_git_state(raw),
     }
     if isinstance(raw.get("evidence"), dict):
+        from cli.integrity import verify_captured_files
+        verify_captured_files(raw["evidence"])
         if "scientific" in raw["evidence"]:
             from cli.scientific import verify_scientific_evidence
             verify_scientific_evidence(raw["evidence"]["scientific"])
@@ -1279,7 +1294,13 @@ def _lead_collect_artifact_paths(root: Path, explicit: list[Path]) -> list[Path]
     return unique
 
 
-def _lead_compile_packet(root: Path, artifacts: list[dict[str, Any]], task_override: str | None) -> dict[str, Any]:
+def _lead_compile_packet(root: Path, artifacts: list[dict[str, Any]], task_override: str | None,
+                         aggregate_tasks: bool = False) -> dict[str, Any]:
+    tasks = {str(artifact.get("task") or "").strip() for artifact in artifacts} - {""}
+    if aggregate_tasks and not (task_override or "").strip():
+        raise ValueError("lead_artifact_aggregate_task_required: provide an explicit task name for aggregation")
+    if len(tasks) > 1 and not aggregate_tasks:
+        raise ValueError("lead_artifact_task_mismatch: select one task or explicitly use --aggregate-tasks with --task")
     validation = validate_workspace(root)
 
     if not artifacts:
@@ -1327,12 +1348,37 @@ def _lead_compile_packet(root: Path, artifacts: list[dict[str, Any]], task_overr
     unverified_claims: list[str] = []
     contradictions: list[str] = []
 
+    # Keep historical artifacts, but only the latest execution can describe a test's current result.
+    latest_tests = {}
+    latest_snapshots = {}
+    for artifact in artifacts_sorted:
+        task_key = artifact.get("task")
+        evidence = artifact.get("evidence") or {}
+        if "workspace_snapshot_sha256" in evidence:
+            latest_snapshots[task_key] = evidence["workspace_snapshot_sha256"]
+        for claim in artifact.get("claims_made", []):
+            scope = _lead_test_scope(claim)
+            if scope is not None:
+                latest_tests[(task_key, scope)] = artifact
+
     for artifact in artifacts_sorted:
         for claim in artifact.get("claims_made", []):
             text = str(claim.get("text") or "").strip()
             if not text:
                 continue
             status = _lead_status(claim.get("verification_status"))
+            scope = _lead_test_scope(claim)
+            if scope is not None:
+                task_key = artifact.get("task")
+                if latest_tests[(task_key, scope)] is not artifact:
+                    continue
+                evidence = claim["evidence"]
+                if evidence["exit_code"] != evidence["expected_exit_code"]:
+                    status = "contradicted"
+                elif task_key in latest_snapshots and (
+                        not latest_snapshots[task_key] or evidence.get("snapshot_sha256") != latest_snapshots[task_key] or
+                        evidence.get("snapshot_unchanged") is not True):
+                    status = "unverified"
             key = text.lower()
             claim_statuses.setdefault(key, set()).add(status)
             claim_original.setdefault(key, text)
@@ -1582,9 +1628,12 @@ def compile_lead_state(
     root: Path,
     task_override: str | None,
     artifact_paths: list[Path],
-    validate_artifacts: bool = False,
+    validate_artifacts: bool = True,
     receipt_evidence: dict[str, Any] | None = None,
+    aggregate_tasks: bool = False,
 ) -> tuple[dict[str, Any], Path, Path, Path, dict[str, Any], list[str]]:
+    if not validate_artifacts:
+        raise ValueError("lead_artifact_validation_required")
     artifacts: list[dict[str, Any]] = []
     warnings: list[str] = []
     schema_errors: list[str] = []
@@ -1592,30 +1641,22 @@ def compile_lead_state(
         loaded_records, loaded_warnings = _lead_load_artifacts_from_file(root, artifact_path)
         warnings.extend(loaded_warnings)
         for idx, (raw, source_ref) in enumerate(loaded_records, start=1):
-            if validate_artifacts:
-                try:
-                    schema_errors.extend(_lead_validate_artifact_schema(root, raw, source_ref))
-                except ValueError as e:
-                    schema_errors.append(str(e))
+            try:
+                schema_errors.extend(_lead_validate_artifact_schema(root, raw, source_ref))
+            except ValueError as e:
+                schema_errors.append(str(e))
             artifacts.append(_lead_normalize_artifact(raw, source_ref=source_ref, index=idx))
 
-    if validate_artifacts and warnings:
+    if warnings:
         raise ValueError("; ".join(warnings))
 
-    if validate_artifacts and not artifacts:
+    if not artifacts:
         raise ValueError("lead_artifact_input_empty: no valid artifact records loaded")
 
     if schema_errors:
         raise ValueError("; ".join(schema_errors))
 
-    packet = _lead_compile_packet(root, artifacts, task_override)
-    if warnings:
-        validation = packet.get("validation")
-        if isinstance(validation, dict):
-            current_warnings = validation.get("warnings")
-            if isinstance(current_warnings, list):
-                merged = sorted({*current_warnings, *warnings})
-                validation["warnings"] = merged
+    packet = _lead_compile_packet(root, artifacts, task_override, aggregate_tasks=aggregate_tasks)
 
     sticky_dir = root / ".sticky"
     json_path = sticky_dir / "current-state.json"
@@ -1795,6 +1836,7 @@ def memory_diff(
 def lead_compile(
     root: Path = typer.Option(Path("."), "--root", help="Workspace root"),
     task: str | None = typer.Option(None, "--task", help="Optional task override for current-state packet"),
+    aggregate_tasks: bool = typer.Option(False, "--aggregate-tasks", help="Explicitly combine different tasks; requires --task"),
     artifact: list[Path] = typer.Option(None, "--artifact", help="Artifact file (.json or .jsonl). Repeat to include multiple files."),
     json_output: bool = typer.Option(False, "--json", help="Print compiled current-state JSON"),
 ) -> None:
@@ -1805,7 +1847,8 @@ def lead_compile(
             root,
             task_override=task,
             artifact_paths=artifact_paths,
-            validate_artifacts=bool(artifact_paths),
+            validate_artifacts=True,
+            aggregate_tasks=aggregate_tasks,
         )
     except (ValueError, storage_backend.StorageError, archive_backend.ArchiveError) as e:
         typer.echo(str(e))

@@ -9,8 +9,10 @@ def compiled():
 
 
 def isolate_compile(monkeypatch):
-    monkeypatch.setattr(yare, "_lead_collect_artifact_paths", lambda root, explicit: [])
-    monkeypatch.setattr(yare, "_lead_compile_packet", lambda root, artifacts, task: compiled())
+    monkeypatch.setattr(yare, "_lead_collect_artifact_paths", lambda root, explicit: [root / "fixture.json"])
+    monkeypatch.setattr(yare, "_lead_load_artifacts_from_file", lambda root, path: ([({}, "fixture")], []))
+    monkeypatch.setattr(yare, "_lead_validate_artifact_schema", lambda *args: [])
+    monkeypatch.setattr(yare, "_lead_compile_packet", lambda root, artifacts, task, **options: compiled())
 
 
 def test_database_failure_preserves_previous_exports(tmp_path, monkeypatch):

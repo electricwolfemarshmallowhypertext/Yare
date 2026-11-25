@@ -112,6 +112,7 @@ Write-Output "compile:"
 $compileArguments = @(
     "lead",
     "compile",
+    "--aggregate-tasks",
     "--task",
     "compile ai work lead state",
     "--artifact",

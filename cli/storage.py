@@ -180,6 +180,10 @@ def verify_handoff_record(row: Any) -> dict[str, Any]:
         evidence = artifact.get("evidence") or {}
         if not isinstance(evidence, dict):
             raise StorageError("handoff_evidence_invalid")
+        try:
+            integrity.verify_captured_files(evidence)
+        except ValueError as exc:
+            raise StorageError(str(exc)) from exc
         if "scientific" in evidence:
             from cli.scientific import ScientificEvidenceError, verify_scientific_evidence
             try:

@@ -14,6 +14,7 @@ foreach ($target in @("current-state.json", "current-state.md")) {
 $args = @(
     "lead",
     "compile",
+    "--aggregate-tasks",
     "--task",
     "compile ai work lead state",
     "--artifact",

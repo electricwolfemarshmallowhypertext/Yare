@@ -3,9 +3,11 @@
 import argparse
 import hashlib
 from html.parser import HTMLParser
+import io
 import json
 from pathlib import Path, PurePosixPath
 import runpy
+import zipfile
 
 
 DECISION = ("Defer source classification. Retain the duplicated hypotheses, disputed unit statements, "
@@ -13,6 +15,7 @@ DECISION = ("Defer source classification. Retain the duplicated hypotheses, disp
 MODEL = "qwen3:4b"
 MODEL_HASH = "359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7"
 OFFLINE_HASH = "ae452a1e3da5a0ca9fb244aecf02f999b8be9bbc90fbaee2c5f9d9247a5ab5c1"
+SHARED_VERIFIER_HASH = "8366520a0a4f2f20b77e59c50592b0e92b74a8713940cf4f739175ae29e592b4"
 
 
 def sha(raw):
@@ -97,6 +100,25 @@ def verify_review(evidence, science, parent, reference):
                 for item in evidence["followup_recommendations"]), "Follow-up exceeds decision")
 
 
+def verify_helper_sources(root):
+    archive = (root / "original-offline-bundle.zip").read_bytes()
+    require(sha(archive) == OFFLINE_HASH, "Original offline bundle changed")
+    # The evidence manifest is not a trust root for executable helper code.
+    with zipfile.ZipFile(io.BytesIO(archive)) as original:
+        names = {item.filename for item in original.infolist() if not item.is_dir()}
+        actual = {path.relative_to(root / "offline").as_posix()
+                  for path in (root / "offline").rglob("*") if path.is_file()}
+        require(actual == names, "Extracted offline file set differs from pinned archive")
+        for name in names:
+            relative = PurePosixPath(name)
+            require(not relative.is_absolute() and ".." not in relative.parts and ":" not in name and "\\" not in name,
+                    "Unsafe original archive path")
+            path = root / "offline" / name
+            require(not path.is_symlink() and path.resolve().is_relative_to(root / "offline") and
+                    path.read_bytes() == original.read(name), "Extracted offline bytes differ from pinned archive: " + name)
+    require(sha((root / "shared_verifier.py").read_bytes()) == SHARED_VERIFIER_HASH, "Untrusted shared verifier")
+
+
 def verify(root, reproduce=False):
     root = root.resolve()
     manifest = read(root / "manifest.json")
@@ -108,7 +130,7 @@ def verify(root, reproduce=False):
                 not path.is_symlink() and path.resolve().is_relative_to(root) and path.stat().st_size <= 2 * 1024 * 1024,
                 "Unsafe bundle path")
         require(sha(path.read_bytes()) == expected, "Member hash differs: " + name)
-    require(sha((root / "original-offline-bundle.zip").read_bytes()) == OFFLINE_HASH, "Original offline bundle changed")
+    verify_helper_sources(root)
     frozen = runpy.run_path(str(root / "offline/verify.py"))
     frozen["verify"](root / "offline", reproduce)
     shared = runpy.run_path(str(root / "shared_verifier.py"))

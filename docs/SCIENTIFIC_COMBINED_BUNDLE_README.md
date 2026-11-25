@@ -10,6 +10,14 @@ was retained and flagged, not repaired into a passing scientific result.
 
 Inspect `verify.py`, `shared_verifier.py` and `offline/analysis.py` before running:
 
+Check the downloaded archive against its separately published SHA-256 before
+extracting or executing it. The original published archive remains unchanged.
+For verification of an extracted folder that may have been modified, use the
+current repository's `scripts/verify_scientific_review_bundle.py --root FOLDER`;
+it authenticates helper bytes before execution, including the extracted offline
+files against the pinned original archive. A folder's own manifest is not a
+trusted authorization to run its code.
+
 ```text
 python verify.py
 python verify.py --reproduce
