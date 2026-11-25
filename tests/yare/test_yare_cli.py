@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import errno
+from contextlib import contextmanager
 import hashlib
 import json
 from pathlib import Path
@@ -709,13 +711,27 @@ def test_skill_apply_edit_fails_invalid_schema(ws: Path) -> None:
     assert "skill_edit_schema_invalid" in result.stdout
 
 
-def test_skill_apply_edit_fails_for_ambiguous_or_missing_target(ws: Path) -> None:
+def test_skill_apply_edit_fails_for_ambiguous_or_missing_target(ws: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     scaffold_workspace(ws)
+    original_temporary_directory = tempfile.TemporaryDirectory
+    temporary_candidates = []
+
+    @contextmanager
+    def cleanup_failure(*args: object, **kwargs: object):
+        temporary_candidates.append(True)
+        with original_temporary_directory(*args, **kwargs) as directory:
+            try:
+                yield directory
+            finally:
+                raise OSError(errno.ENOTEMPTY, "Simulated Windows candidate cleanup failure")
+
+    monkeypatch.setattr(tempfile, "TemporaryDirectory", cleanup_failure)
     skill_path = ws / "skills" / "s1" / "SKILL.md"
     skill_path.write_text(
         skill_path.read_text(encoding="utf-8") + "\nUse for context drift checks.\n",
         encoding="utf-8",
     )
+    original_skill = skill_path.read_bytes()
 
     ambiguous_edit = ws / "ambiguous-skill-edit.json"
     ambiguous_edit.write_text(
@@ -774,6 +790,9 @@ def test_skill_apply_edit_fails_for_ambiguous_or_missing_target(ws: Path) -> Non
     missing_result = runner.invoke(app, ["skill", "apply-edit", "--root", str(ws), "--edit", str(missing_edit)])
     assert missing_result.exit_code == 1
     assert "skill_edit_target_not_found" in missing_result.stdout
+    assert temporary_candidates == []
+    assert not (ws / ".tmp" / "skill-edit-temp").exists()
+    assert skill_path.read_bytes() == original_skill
 
 
 def test_storage_init_requires_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
