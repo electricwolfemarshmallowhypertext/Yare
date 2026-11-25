@@ -762,13 +762,12 @@ def apply_skill_edit(root: Path, edit_path: Path) -> tuple[str, Path, dict[str, 
     target = str(edit_payload.get("target") or "")
     replacement_raw = edit_payload.get("replacement")
     replacement = "" if replacement_raw is None else str(replacement_raw)
+    new_text = _apply_bounded_skill_edit(old_text, edit_type, target, replacement)
 
     temp_parent = root / ".tmp" / "skill-edit-temp"
     temp_parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="yare-skill-edit-", dir=temp_parent) as tmp_dir:
         tmp_path = Path(tmp_dir) / skill_file.name
-        tmp_path.write_text(old_text, encoding="utf-8")
-        new_text = _apply_bounded_skill_edit(old_text, edit_type, target, replacement)
         tmp_path.write_text(new_text, encoding="utf-8")
         proposed_hash = _sha256_file(tmp_path)
         evaluation = (skill_evaluation.evaluate(workspace, skill_file, tmp_path,
