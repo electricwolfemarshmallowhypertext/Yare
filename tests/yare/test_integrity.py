@@ -55,6 +55,46 @@ def test_disputed_supported_claim_is_not_a_confirmed_fact(compile_packet):
     assert state["what_contradicts_prior_state"] == ["CI passed"]
 
 
+@pytest.mark.parametrize("first_exit,last_exit", [(0, 1), (1, 0)])
+def test_latest_observed_test_supersedes_previous_execution(compile_packet, first_exit, last_exit):
+    records = []
+    for index, exit_code in enumerate((first_exit, last_exit)):
+        claim = supported_claim("CI passed", exit_code)
+        claim["verification_status"] = "verified" if exit_code == 0 else "unverified"
+        records.append({"timestamp": f"2026-11-25T00:00:0{index}Z", "claims": [claim]})
+    state = compile_packet(records)["current_state"]
+    assert state["what_is_true"] == (["CI passed"] if last_exit == 0 else [])
+    assert state["what_contradicts_prior_state"] == ([] if last_exit == 0 else ["CI passed"])
+    assert state["what_is_unverified"] == []
+
+
+@pytest.mark.parametrize("latest_snapshot", ["b" * 64, None])
+def test_code_change_without_retest_invalidates_previous_pass(compile_packet, latest_snapshot):
+    claim = supported_claim("CI passed")
+    claim["evidence"].update(snapshot_sha256="a" * 64, snapshot_unchanged=True)
+    state = compile_packet([
+        {"task": "task", "timestamp": "2026-11-25T00:00:00Z", "claims": [claim],
+         "evidence": {"workspace_snapshot_sha256": "a" * 64}},
+        {"task": "task", "timestamp": "2026-11-25T00:00:01Z", "claims": [],
+         "evidence": {"workspace_snapshot_sha256": latest_snapshot}},
+    ])["current_state"]
+    assert state["what_is_true"] == []
+    assert state["what_is_unverified"] == ["CI passed"]
+
+
+def test_unchanged_tested_snapshot_keeps_passing_result(compile_packet):
+    claim = supported_claim("CI passed")
+    claim["evidence"].update(snapshot_sha256="a" * 64, snapshot_unchanged=True)
+    state = compile_packet([{"claims": [claim], "evidence": {"workspace_snapshot_sha256": "a" * 64}}])["current_state"]
+    assert state["what_is_true"] == ["CI passed"]
+
+
+def test_one_current_test_can_support_multiple_distinct_claims(compile_packet):
+    state = compile_packet([{"claims": [supported_claim("Unit tests passed"),
+                                         supported_claim("No test failures observed")]}])["current_state"]
+    assert state["what_is_true"] == ["No test failures observed", "Unit tests passed"]
+
+
 def test_evidence_ref_and_human_resolution_survive_compile(compile_packet):
     proof = supported_claim("CI passed")["evidence"]
     decision = {"kind": "human_review", "claim": "Release approved", "reviewer": "reviewer-1",

@@ -19,7 +19,7 @@ def sample(monkeypatch, tmp_path):
         assert not warnings
         artifacts.extend(yare._lead_normalize_artifact(raw, source, index)
                          for index, (raw, source) in enumerate(records, 1))
-    packet = yare._lead_compile_packet(tmp_path, artifacts, "compile ai work lead state")
+    packet = yare._lead_compile_packet(tmp_path, artifacts, "compile ai work lead state", aggregate_tasks=True)
     _, receipt = yare._lead_write_receipt(tmp_path, packet, "yare lead compile")
     return packet, receipt
 

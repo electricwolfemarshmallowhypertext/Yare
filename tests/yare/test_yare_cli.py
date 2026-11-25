@@ -517,6 +517,9 @@ def test_lead_compile_demo_artifacts_still_compile(ws: Path) -> None:
         [
             "lead",
             "compile",
+            "--aggregate-tasks",
+            "--task",
+            "compile ai work lead state",
             "--root",
             str(ws),
             "--artifact",
@@ -1237,6 +1240,14 @@ def test_s3_archive_honors_custom_prefix(ws: Path, monkeypatch: pytest.MonkeyPat
 
 def test_lead_compile_prints_s3_uris(ws: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     scaffold_workspace(ws)
+    captures = ws / ".yare/captures"
+    captures.mkdir(parents=True)
+    (captures / "archive.json").write_text(json.dumps({
+        "schema_version": "lead-artifact.v1", "run_id": "archive-fixture", "tool": "fixture",
+        "task": "archive state", "timestamp": "2026-11-25T00:00:00Z", "claims": [],
+        "decisions": [], "files_touched": [], "open_loops": [], "contradictions": [],
+        "human_approval_items": [], "verification_status": "unverified",
+    }), encoding="utf-8")
 
     def fake_archive_lead_compile(**kwargs: object) -> list[str]:
         return ["s3://example-bucket/yare/current-states/hash/current-state.json"]
